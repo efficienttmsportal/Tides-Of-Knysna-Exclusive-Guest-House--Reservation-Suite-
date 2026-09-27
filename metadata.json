@@ -1,0 +1,8 @@
+{
+  "name": "Tides Of Knysna Exclusive Guest House - Reservation Suite",
+  "description": "Comprehensive reservation, hospitality, accounting, marketing, inventory, and operations management suite for Tides of Knysna Exclusive Guest House.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
