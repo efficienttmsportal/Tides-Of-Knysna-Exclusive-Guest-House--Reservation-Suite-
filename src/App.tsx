@@ -14,6 +14,8 @@ import { AttractionsModule } from './components/AttractionsModule';
 import { DocumentActionBar } from './components/DocumentActionBar';
 import { GuestPortal } from './components/GuestPortal';
 import { CompanyInfoModule, CompanyInfoData } from './components/CompanyInfoModule';
+import { GuestAddressBook } from './components/GuestAddressBook';
+import { MeetingMinutesModule } from './components/MeetingMinutesModule';
 import { InventoryNotificationSystem } from './components/InventoryNotificationSystem';
 import { InventoryQrModal } from './components/InventoryQrModal';
 import { SupplierQuickContactModal } from './components/SupplierQuickContactModal';
@@ -1784,6 +1786,20 @@ export const App: React.FC = () => {
         {/* ATTRACTIONS & CONCIERGE DIRECTORY */}
         {activeTab === 'attractions' && (
           <AttractionsModule initialAttractions={ATTRACTIONS_DIRECTORY} />
+        )}
+
+        {/* GUEST ADDRESS BOOK */}
+        {activeTab === 'addressbook' && (
+          <GuestAddressBook 
+            reservations={reservations} 
+            companyInfo={companyInfo} 
+            currentUser={currentUser} 
+          />
+        )}
+
+        {/* MEETING MINUTES MODULE */}
+        {activeTab === 'minutes' && (
+          <MeetingMinutesModule companyInfo={companyInfo} />
         )}
       </main>
 

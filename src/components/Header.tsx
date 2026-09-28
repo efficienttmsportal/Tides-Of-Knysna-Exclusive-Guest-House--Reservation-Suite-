@@ -325,6 +325,32 @@ export const Header: React.FC<HeaderProps> = ({
             <Building2 className="w-3 h-3 text-indigo-400" />
             Company Info
           </button>
+
+          <button
+            id="nav-pill-addressbook"
+            onClick={() => setActiveTab('addressbook')}
+            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
+              activeTab === 'addressbook'
+                ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <span className="font-bold text-[10px] px-1 bg-black/20 rounded">AB</span>
+            Guest Address Book
+          </button>
+
+          <button
+            id="nav-pill-minutes"
+            onClick={() => setActiveTab('minutes')}
+            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
+              activeTab === 'minutes'
+                ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <span className="font-bold text-[10px] px-1 bg-black/20 rounded">MIN</span>
+            Meeting Minutes
+          </button>
         </div>
       </div>
     </header>
