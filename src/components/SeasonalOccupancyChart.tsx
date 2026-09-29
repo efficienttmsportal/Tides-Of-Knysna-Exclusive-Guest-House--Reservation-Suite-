@@ -219,6 +219,17 @@ export const SeasonalOccupancyChart: React.FC<SeasonalOccupancyChartProps> = ({
             <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
             Low Stock Supply Graph
           </button>
+
+          {onSelectTab && (
+            <button
+              onClick={() => onSelectTab('forecast')}
+              className="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs"
+              title="Open Inventory Forecasting Module to project future stock needs"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              Consumables Forecast
+            </button>
+          )}
         </div>
       </div>
 

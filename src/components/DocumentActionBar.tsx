@@ -13,9 +13,11 @@ import {
   CloudCheck, 
   Send,
   Eye,
-  FileCheck
+  FileCheck,
+  PenTool
 } from 'lucide-react';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
 
 interface DocumentActionBarProps {
   documentTitle: string;
@@ -25,6 +27,7 @@ interface DocumentActionBarProps {
   onPdf?: () => void;
   onEmail?: (emailData: { to: string; subject: string; message: string }) => void;
   onUploadScan?: (file: File, type: string) => void;
+  onSignatureSaved?: (sig: SignatureData) => void;
   recipientEmail?: string;
   className?: string;
   customExtraButtons?: React.ReactNode;
@@ -38,6 +41,7 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
   onPdf,
   onEmail,
   onUploadScan,
+  onSignatureSaved,
   recipientEmail = '',
   className = '',
   customExtraButtons
@@ -45,6 +49,8 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [savedSignature, setSavedSignature] = useState<SignatureData | null>(null);
   const [emailTo, setEmailTo] = useState(recipientEmail || GUEST_HOUSE_INFO.email);
   const [emailSubject, setEmailSubject] = useState(
     `${GUEST_HOUSE_INFO.name} - ${documentTitle} ${documentNumber ? `(${documentNumber})` : ''}`
@@ -185,6 +191,21 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
         >
           <Scan className="w-3.5 h-3.5 text-purple-600" />
           Scan / Upload
+        </button>
+
+        {/* DIGITAL SIGN */}
+        <button
+          id={`btn-sign-${documentTitle.toLowerCase().replace(/\s+/g, '-')}`}
+          onClick={() => setShowSignModal(true)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border shadow-sm ${
+            savedSignature 
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+          }`}
+          title="Sign document via touchscreen or mouse"
+        >
+          <PenTool className="w-3.5 h-3.5 text-emerald-600" />
+          {savedSignature ? 'Signed ✓' : 'Digital Sign'}
         </button>
 
         {customExtraButtons}
@@ -370,6 +391,47 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
                   Done & Attach
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIGITAL SIGNATURE MODAL */}
+      {showSignModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 relative animate-scale-up space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Digital Document Sign-Off</h3>
+                <p className="text-xs text-slate-500">Apply touchscreen or mouse signature to {documentTitle}</p>
+              </div>
+              <button 
+                onClick={() => setShowSignModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <DigitalSignatureBlock
+              title={`Authorization Signature • ${documentTitle}`}
+              signerRole="Authorized Signatory"
+              onSave={(sig) => {
+                setSavedSignature(sig);
+                if (onSignatureSaved) onSignatureSaved(sig);
+                setShowSignModal(false);
+              }}
+              initialSignature={savedSignature}
+            />
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowSignModal(false)}
+                className="px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ import {
 import { DocumentActionBar } from './DocumentActionBar';
 import { CheckInRecord, Reservation } from '../types';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
 
 interface CheckInModuleProps {
   reservations: Reservation[];
@@ -337,6 +338,30 @@ export const CheckInModule: React.FC<CheckInModuleProps> = ({ reservations }) =>
                   className="w-full text-xs px-3 py-2 border rounded-lg bg-slate-50 disabled:bg-slate-50"
                 />
               </div>
+            </div>
+
+            {/* Digital Signatures for Check-In Record */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              <DigitalSignatureBlock
+                title="Guest Registration Signature"
+                signerRole="Guest Signatory"
+                signerName={activeCheckIn.guestName}
+                onSave={(sig) => {
+                  const updated = { ...activeCheckIn, registrationFormSigned: true };
+                  setActiveCheckIn(updated);
+                  setCheckIns(checkIns.map(c => c.id === updated.id ? updated : c));
+                }}
+              />
+              <DigitalSignatureBlock
+                title="Duty Manager Formal Sign-Off"
+                signerRole="Estate Duty Manager"
+                signerName={activeCheckIn.dutyManager}
+                onSave={(sig) => {
+                  const updated = { ...activeCheckIn, status: 'Checked-In' as const };
+                  setActiveCheckIn(updated);
+                  setCheckIns(checkIns.map(c => c.id === updated.id ? updated : c));
+                }}
+              />
             </div>
 
             <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-center justify-between">

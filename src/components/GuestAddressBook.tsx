@@ -48,18 +48,27 @@ export const GuestAddressBook: React.FC<GuestAddressBookProps> = ({
   companyInfo,
   currentUser
 }) => {
-  // Extract unique guests from reservations or maintain state
+  const ADDRESS_BOOK_KEY = 'tok_guest_address_book_v2';
+
+  // Extract unique guests from reservations or maintain state with localStorage
   const [guests, setGuests] = useState<GuestContact[]>(() => {
+    try {
+      const saved = localStorage.getItem(ADDRESS_BOOK_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load guest address book from storage', e);
+    }
+
     // Derive initial guest list from reservations
     const map = new Map<string, GuestContact>();
     reservations.forEach((res, index) => {
-      const email = res.guestEmail || `guest${index}@example.com`;
+      const email = res.email || `guest${index}@example.com`;
       if (!map.has(email)) {
         map.set(email, {
           id: `gst-${index + 100}`,
-          fullName: res.guestName,
+          fullName: `${res.customerName} ${res.customerSurname}`,
           email: email,
-          phone: res.guestPhone || '+27 82 555 0199',
+          phone: res.contactNumber || '+27 82 555 0199',
           address: '14 Marine Drive, Plettenberg Bay',
           city: 'Garden Route',
           country: 'South Africa',
@@ -83,6 +92,17 @@ export const GuestAddressBook: React.FC<GuestAddressBookProps> = ({
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState('Welcome Back to ' + companyInfo.name);
   const [emailBody, setEmailBody] = useState('Dear Guest,\n\nWe look forward to welcoming you back to our luxury 5-star sanctuary.\n\nWarm regards,\n' + companyInfo.salesPerson);
+  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
+
+  // Sync to localStorage
+  const saveGuestsList = (list: GuestContact[]) => {
+    setGuests(list);
+    try {
+      localStorage.setItem(ADDRESS_BOOK_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
 
   const filteredGuests = guests.filter(g => {
     const matchesSearch = g.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -95,20 +115,73 @@ export const GuestAddressBook: React.FC<GuestAddressBookProps> = ({
   const handleSaveGuest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingGuest) return;
+    let updated: GuestContact[];
     if (isAdding) {
-      setGuests([editingGuest, ...guests]);
+      updated = [editingGuest, ...guests];
     } else {
-      setGuests(guests.map(g => g.id === editingGuest.id ? editingGuest : g));
+      updated = guests.map(g => g.id === editingGuest.id ? editingGuest : g);
     }
+    saveGuestsList(updated);
     setEditingGuest(null);
     setIsAdding(false);
+    setFeedbackNotice(`Guest record for "${editingGuest.fullName}" saved successfully.`);
+    setTimeout(() => setFeedbackNotice(null), 3500);
   };
 
   const handleDeleteGuest = (id: string) => {
     if (confirm('Are you sure you want to remove this guest from the permanent address book?')) {
-      setGuests(guests.filter(g => g.id !== id));
+      const updated = guests.filter(g => g.id !== id);
+      saveGuestsList(updated);
       if (selectedGuestForDetail?.id === id) setSelectedGuestForDetail(null);
+      setFeedbackNotice('Guest profile deleted from address book.');
+      setTimeout(() => setFeedbackNotice(null), 3000);
     }
+  };
+
+  // Export to CSV File
+  const handleExportCsv = () => {
+    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Address', 'City', 'Country', 'VIP Status', 'Preferences', 'Total Stays', 'Total Spent (ZAR)', 'Last Visit', 'Notes'];
+    const rows = guests.map(g => [
+      g.id,
+      `"${g.fullName.replace(/"/g, '""')}"`,
+      `"${g.email}"`,
+      `"${g.phone}"`,
+      `"${g.address.replace(/"/g, '""')}"`,
+      `"${g.city}"`,
+      `"${g.country}"`,
+      `"${g.vipStatus}"`,
+      `"${g.preferences.join('; ')}"`,
+      g.totalStays,
+      g.totalSpent,
+      g.lastVisit,
+      `"${g.notes.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `knysna-guest-address-book-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setFeedbackNotice('Guest Address Book exported to CSV file successfully.');
+    setTimeout(() => setFeedbackNotice(null), 3500);
+  };
+
+  // Export to JSON File
+  const handleExportJson = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(guests, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `knysna-guest-address-book-${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    setFeedbackNotice('Guest Address Book backup file (.json) downloaded.');
+    setTimeout(() => setFeedbackNotice(null), 3500);
   };
 
   const handlePrint = () => {
@@ -117,6 +190,17 @@ export const GuestAddressBook: React.FC<GuestAddressBookProps> = ({
 
   return (
     <div className="space-y-6 pb-12 font-['Arial',sans-serif]">
+      {/* Feedback Toast */}
+      {feedbackNotice && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between shadow-sm animate-fade-in no-print">
+          <span className="flex items-center gap-1.5">
+            <Check className="w-4 h-4 text-emerald-600" />
+            {feedbackNotice}
+          </span>
+          <button onClick={() => setFeedbackNotice(null)} className="text-emerald-700 font-bold">✕</button>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -131,12 +215,27 @@ export const GuestAddressBook: React.FC<GuestAddressBookProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportCsv}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-xs"
+            title="Export full address book to spreadsheet CSV file for offline backup"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600" /> Save to CSV File
+          </button>
+          <button
+            onClick={handleExportJson}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-xs"
+            title="Download JSON data file for digital archive"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" /> Backup JSON
+          </button>
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-300 shadow-xs"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            title="Print hard copy report on inkjet, laser printers, Adobe PDF, and Universal Print drivers"
           >
-            <Printer className="w-4 h-4" /> Print Address Book (PDF / Laser)
+            <Printer className="w-3.5 h-3.5" /> Print Hard Copies (PDF/Laser)
           </button>
           <button
             onClick={() => {

@@ -266,7 +266,15 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
   onUpdateCompanyInfo
 }) => {
   const [activeTab, setActiveTab] = useState<'specials' | 'branding' | 'social' | 'hashtags' | 'sales_report'>('specials');
-  const [specials, setSpecials] = useState<MarketingSpecial[]>(INITIAL_SPECIALS);
+  const [specials, setSpecials] = useState<MarketingSpecial[]>(() => {
+    try {
+      const saved = localStorage.getItem('tok_marketing_specials_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load specials from localStorage', e);
+    }
+    return INITIAL_SPECIALS;
+  });
   const [selectedSpecialId, setSelectedSpecialId] = useState<string>(specials[0]?.id || '');
   const [copiedHash, setCopiedHash] = useState(false);
   const [copiedVoucher, setCopiedVoucher] = useState(false);
@@ -274,6 +282,14 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
   const [selectedSeason, setSelectedSeason] = useState<'Spring' | 'Summer' | 'Autumn' | 'Winter'>('Spring');
   const [autoPreviewMode, setAutoPreviewMode] = useState<'voucher' | 'instagram' | 'facebook' | 'whatsapp' | 'signature'>('voucher');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Full image view toggle for marketing photography on all social media pages
+  const [showFullImageOnly, setShowFullImageOnly] = useState(false);
+
+  // Hashtags Editing State
+  const [newHashtagInput, setNewHashtagInput] = useState('');
+  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState('');
 
   const activeSpecial = specials.find(s => s.id === selectedSpecialId) || specials[0];
   const [editSpecial, setEditSpecial] = useState<MarketingSpecial>(activeSpecial);
@@ -357,7 +373,14 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
       id: `sp-${seasonName.toLowerCase()}-${Date.now()}-${idx}`
     }));
 
-    setSpecials(prev => [...newSpecials, ...prev]);
+    const updated = [...newSpecials, ...specials];
+    setSpecials(updated);
+    try {
+      localStorage.setItem('tok_marketing_specials_v2', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('tok_specials_updated', { detail: updated }));
+    } catch (e) {
+      console.warn('Failed to persist specials', e);
+    }
     setSelectedSpecialId(newSpecials[0].id);
     setEditSpecial(newSpecials[0]);
     setSelectedSeason(seasonName);
@@ -366,8 +389,15 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
   };
 
   const handleSaveSpecial = () => {
-    setSpecials(specials.map(s => s.id === editSpecial.id ? editSpecial : s));
-    setSaveSuccessMsg('Special promotion & assets successfully updated.');
+    const updated = specials.map(s => s.id === editSpecial.id ? editSpecial : s);
+    setSpecials(updated);
+    try {
+      localStorage.setItem('tok_marketing_specials_v2', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('tok_specials_updated', { detail: updated }));
+    } catch (e) {
+      console.warn('Failed to persist specials', e);
+    }
+    setSaveSuccessMsg('Special promotion, hashtags & media assets successfully updated & synchronized.');
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
@@ -396,21 +426,38 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
       ],
       targetAudience: 'Luxury Travelers'
     };
-    setSpecials([newSp, ...specials]);
+    const updated = [newSp, ...specials];
+    setSpecials(updated);
+    try {
+      localStorage.setItem('tok_marketing_specials_v2', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('tok_specials_updated', { detail: updated }));
+    } catch (e) {
+      console.warn('Failed to persist specials', e);
+    }
     setSelectedSpecialId(newId);
     setEditSpecial(newSp);
   };
 
   const handleDeleteSpecial = (id: string) => {
     if (specials.length <= 1) {
-      alert('You must have at least one active special.');
+      setSaveSuccessMsg('A minimum of one active special promotion is required.');
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
       return;
     }
-    if (confirm('Delete this promotional special?')) {
-      const updated = specials.filter(s => s.id !== id);
-      setSpecials(updated);
-      setSelectedSpecialId(updated[0].id);
+    const filtered = specials.filter(s => s.id !== id);
+    setSpecials(filtered);
+    try {
+      localStorage.setItem('tok_marketing_specials_v2', JSON.stringify(filtered));
+      window.dispatchEvent(new CustomEvent('tok_specials_updated', { detail: filtered }));
+    } catch (e) {
+      console.warn('Failed to persist specials', e);
     }
+    if (selectedSpecialId === id && filtered.length > 0) {
+      setSelectedSpecialId(filtered[0].id);
+      setEditSpecial(filtered[0]);
+    }
+    setSaveSuccessMsg('Special campaign removed.');
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
   const hashtagsList = editSpecial.hashtags || [
@@ -423,6 +470,38 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
     '#BoutiqueHotelSA',
     '#KnysnaHolidays'
   ];
+
+  const handleAddHashtag = (tagToAdd?: string) => {
+    const val = (tagToAdd || newHashtagInput).trim();
+    if (!val) return;
+    const formatted = val.startsWith('#') ? val : `#${val}`;
+    const current = editSpecial.hashtags || [];
+    if (!current.includes(formatted)) {
+      const updated = [...current, formatted];
+      setEditSpecial(prev => ({ ...prev, hashtags: updated }));
+      setSpecials(prev => prev.map(s => s.id === editSpecial.id ? { ...s, hashtags: updated } : s));
+      setSaveSuccessMsg(`Added ${formatted} to active social hashtags.`);
+      setTimeout(() => setSaveSuccessMsg(null), 2500);
+    }
+    setNewHashtagInput('');
+  };
+
+  const handleDeleteHashtag = (index: number) => {
+    const current = editSpecial.hashtags || [];
+    const updated = current.filter((_, i) => i !== index);
+    setEditSpecial(prev => ({ ...prev, hashtags: updated }));
+    setSpecials(prev => prev.map(s => s.id === editSpecial.id ? { ...s, hashtags: updated } : s));
+  };
+
+  const handleSaveEditedTag = (index: number) => {
+    if (!editingTagValue.trim()) return;
+    const formatted = editingTagValue.trim().startsWith('#') ? editingTagValue.trim() : `#${editingTagValue.trim()}`;
+    const current = [...(editSpecial.hashtags || [])];
+    current[index] = formatted;
+    setEditSpecial(prev => ({ ...prev, hashtags: current }));
+    setSpecials(prev => prev.map(s => s.id === editSpecial.id ? { ...s, hashtags: current } : s));
+    setEditingTagIndex(null);
+  };
 
   const handleCopyHashtags = () => {
     navigator.clipboard.writeText(hashtagsList.join(' '));
@@ -884,40 +963,105 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    {(editSpecial.hashtags || []).map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-medium flex items-center gap-1"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => {
-                            const updated = (editSpecial.hashtags || []).filter((_, i) => i !== idx);
-                            setEditSpecial({ ...editSpecial, hashtags: updated });
-                          }}
-                          className="text-emerald-500 hover:text-rose-600 ml-0.5"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {(editSpecial.hashtags || []).map((tag, idx) => (
+                        editingTagIndex === idx ? (
+                          <div key={idx} className="flex items-center gap-1 bg-white border border-emerald-500 rounded-lg p-0.5 shadow-xs">
+                            <input
+                              type="text"
+                              value={editingTagValue}
+                              onChange={(e) => setEditingTagValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditedTag(idx);
+                                if (e.key === 'Escape') setEditingTagIndex(null);
+                              }}
+                              autoFocus
+                              className="px-2 py-0.5 text-xs font-mono text-slate-800 outline-none w-28"
+                            />
+                            <button
+                              onClick={() => handleSaveEditedTag(idx)}
+                              className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                              title="Save Tag"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setEditingTagIndex(null)}
+                              className="p-1 text-slate-400 hover:text-slate-600"
+                              title="Cancel"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            key={idx}
+                            className="group px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-medium flex items-center gap-1 hover:bg-emerald-100 transition"
+                          >
+                            <span 
+                              onClick={() => {
+                                setEditingTagIndex(idx);
+                                setEditingTagValue(tag);
+                              }}
+                              className="cursor-pointer hover:underline"
+                              title="Click to edit hashtag"
+                            >
+                              {tag}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteHashtag(idx)}
+                              className="text-emerald-500 hover:text-rose-600 ml-0.5"
+                              title="Remove tag"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        )
+                      ))}
+                    </div>
 
-                    <button
-                      onClick={() => {
-                        const newTag = prompt('Enter new hashtag (e.g. #KnysnaSanctuary):');
-                        if (newTag) {
-                          const formatted = newTag.startsWith('#') ? newTag : `#${newTag}`;
-                          setEditSpecial({
-                            ...editSpecial,
-                            hashtags: [...(editSpecial.hashtags || []), formatted]
-                          });
-                        }
-                      }}
-                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition"
-                    >
-                      <Plus className="w-3 h-3" /> Add Tag
-                    </button>
+                    {/* Inline Add Hashtag Bar */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs font-bold">#</span>
+                        <input
+                          type="text"
+                          value={newHashtagInput}
+                          onChange={(e) => setNewHashtagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddHashtag();
+                            }
+                          }}
+                          placeholder="AddCustomTag (press Enter)"
+                          className="w-full text-xs pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddHashtag()}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition shadow-xs shrink-0"
+                      >
+                        <Plus className="w-3 h-3" /> Add Tag
+                      </button>
+                    </div>
+
+                    {/* Popular Quick-Add Tag Suggestions */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] text-slate-500">
+                      <span className="font-semibold text-slate-400">Quick Add:</span>
+                      {['#KnysnaLagoon', '#GardenRouteLuxury', '#TidesOfKnysna', '#5StarSanctuary', '#HoneymoonDestinationSA'].map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => handleAddHashtag(t)}
+                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-mono transition"
+                        >
+                          +{t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -933,8 +1077,23 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                     </span>
                   </div>
 
-                  {/* Mode switcher tabs */}
-                  <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* FULL IMAGE VIEW TOGGLE */}
+                    <button
+                      onClick={() => setShowFullImageOnly(!showFullImageOnly)}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 ${
+                        showFullImageOnly
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                      }`}
+                      title="Toggle full uncropped image for marketing material"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      {showFullImageOnly ? 'Full Image: ON (Uncropped)' : 'View Full Image'}
+                    </button>
+
+                    {/* Mode switcher tabs */}
+                    <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
                     <button
                       onClick={() => setAutoPreviewMode('voucher')}
                       className={`px-3 py-1 rounded-md transition ${
@@ -987,6 +1146,59 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+
+                {/* UNPROPPED FULL IMAGE VIEW FOR MARKETING MEDIA & SOCIAL ADS */}
+                {showFullImageOnly && (
+                  <div className="space-y-3 bg-slate-900 text-white p-4 rounded-2xl border border-slate-700 shadow-xl">
+                    <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                          <ImageIcon className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <strong className="text-white block font-sans">Full Resolution Marketing Media Asset (Uncropped)</strong>
+                          <span className="text-[11px] text-slate-400">High-Fidelity 1200px Photography for Social Feed & Ad Placement</span>
+                        </div>
+                      </div>
+                      <span className="bg-emerald-500 text-slate-950 font-bold px-2 py-0.5 rounded text-[10px] uppercase font-mono">
+                        {editSpecial.season || 'Special'} • {editSpecial.discountPercent}% Off
+                      </span>
+                    </div>
+
+                    <div className="w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-slate-800 relative group">
+                      {editSpecial.imageUrl ? (
+                        <img 
+                          src={editSpecial.imageUrl} 
+                          alt={editSpecial.title} 
+                          className="w-full h-auto max-h-[520px] object-contain rounded-xl"
+                        />
+                      ) : (
+                        <div className="py-24 text-center text-slate-500 text-xs">
+                          No marketing image URL provided. Upload an image above or select a seasonal preset.
+                        </div>
+                      )}
+                      <div className="absolute bottom-3 left-3 right-3 bg-slate-950/80 backdrop-blur-sm p-3 rounded-xl border border-slate-700/60 flex items-center justify-between text-xs">
+                        <div className="truncate mr-2">
+                          <strong className="text-white block truncate">{editSpecial.title}</strong>
+                          <span className="text-[11px] text-slate-300">Code: <code className="font-mono text-emerald-400 font-bold">{editSpecial.promoCode}</code> • Valid until: {editSpecial.validUntil}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (editSpecial.imageUrl) {
+                              navigator.clipboard.writeText(editSpecial.imageUrl);
+                              setSaveSuccessMsg('Image URL copied to clipboard.');
+                              setTimeout(() => setSaveSuccessMsg(null), 2500);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shrink-0 transition flex items-center gap-1"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Copy Image URL
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* AUTO PREVIEW 1: LUXURY GUEST VOUCHER / FLYER */}
                 {autoPreviewMode === 'voucher' && (
@@ -1664,40 +1876,152 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 4: CURATED TOURISM HASHTAGS */}
+      {/* SUB-TAB 4: CURATED & EDITABLE TOURISM HASHTAGS */}
       {activeTab === 'hashtags' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">
-                Optimized Tourism & Hospitality Hashtags
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Hash className="w-4 h-4 text-emerald-600" />
+                Live Hashtag Manager & Social Media Tag Editor
               </h3>
               <p className="text-xs text-slate-500">
-                Categorized for maximum reach across Instagram, TikTok, Facebook & Pinterest
+                Edit, add, or customize hashtags. Tags automatically sync into Instagram, Facebook, WhatsApp, and social preview templates.
               </p>
             </div>
             <button
               onClick={handleCopyHashtags}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0"
             >
               {copiedHash ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedHash ? 'Copied to Clipboard!' : 'Copy All Hashtags'}
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-2">
-            {hashtagsList.map(tag => (
-              <span
-                key={tag}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300 text-xs font-medium font-mono transition cursor-pointer"
-                onClick={() => {
-                  navigator.clipboard.writeText(tag);
-                  alert(`Copied ${tag}`);
+          {/* Add Hashtag Input Bar */}
+          <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <div className="relative flex-1">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-mono font-bold text-xs">#</span>
+              <input
+                type="text"
+                value={newHashtagInput}
+                onChange={(e) => setNewHashtagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddHashtag();
+                  }
                 }}
-              >
-                {tag}
-              </span>
-            ))}
+                placeholder="Type custom hashtag (e.g. KnysnaSunsetVillas or SpringTravel2026)..."
+                className="w-full text-xs pl-8 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => handleAddHashtag()}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400" /> Add Hashtag
+            </button>
+          </div>
+
+          {/* Preset Hashtag Category Packs */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              1-Click Luxury Tourism Packs (Tap to Append to Campaign):
+            </span>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[
+                { name: 'Lagoon & Heads Pack', tags: ['#KnysnaLagoon', '#TheHeadsKnysna', '#GardenRouteSA', '#FeatherbedEcoTour'] },
+                { name: '5-Star Luxury Pack', tags: ['#LuxurySanctuary', '#BoutiqueHotelSA', '#5StarHospitality', '#VIPTravelSA'] },
+                { name: 'Culinary & Oysters Pack', tags: ['#KnysnaOysters', '#PlettWineRoute', '#ArtisanDining', '#CapClassique'] },
+                { name: 'Honeymoon & Romance', tags: ['#HoneymoonSA', '#RomanticLagoon', '#CouplesRetreat', '#VillaSanctuary'] }
+              ].map(pack => (
+                <button
+                  key={pack.name}
+                  type="button"
+                  onClick={() => {
+                    pack.tags.forEach(t => handleAddHashtag(t));
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-xl border border-slate-200 hover:border-emerald-300 transition font-medium flex items-center gap-1.5 text-[11px]"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  + {pack.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Hashtags List with In-Place Edit & Delete */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span className="font-bold text-slate-700">Active Hashtags in Campaign ({hashtagsList.length})</span>
+              <span>Click pencil to edit or trash to remove</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {hashtagsList.map((tag, idx) => {
+                const isEditing = editingTagIndex === idx;
+
+                return isEditing ? (
+                  <div key={idx} className="flex items-center gap-1 bg-white border-2 border-emerald-500 rounded-xl p-1 shadow-xs">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editingTagValue}
+                      onChange={(e) => setEditingTagValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEditedTag(idx);
+                        if (e.key === 'Escape') setEditingTagIndex(null);
+                      }}
+                      className="px-2 py-1 text-xs font-mono text-slate-900 outline-none w-36"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditedTag(idx)}
+                      className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                      title="Save"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTagIndex(null)}
+                      className="p-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 text-[10px]"
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    key={idx}
+                    className="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50/80 text-slate-700 hover:text-emerald-900 border border-slate-200 hover:border-emerald-300 text-xs font-mono transition"
+                  >
+                    <span>{tag}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTagIndex(idx);
+                        setEditingTagValue(tag);
+                      }}
+                      className="p-1 hover:text-emerald-700 text-slate-400 opacity-60 group-hover:opacity-100 transition"
+                      title="Edit Hashtag"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteHashtag(idx)}
+                      className="p-1 hover:text-rose-600 text-slate-400 opacity-60 group-hover:opacity-100 transition"
+                      title="Delete Hashtag"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ import {
   Building2 
 } from 'lucide-react';
 import { CompanyInfoData } from './CompanyInfoModule';
+import { DigitalSignatureBlock } from './DigitalSignatureBlock';
 
 export interface MeetingMinuteItem {
   id: string;
@@ -294,6 +295,20 @@ export const MeetingMinutesModule: React.FC<MeetingMinutesModuleProps> = ({ comp
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Boardroom Signatures */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-slate-200">
+                <DigitalSignatureBlock
+                  title="Chairperson Formal Adoption"
+                  signerRole="Board Chairperson"
+                  signerName={activeMeeting.chairperson}
+                />
+                <DigitalSignatureBlock
+                  title="Secretary & Recording Officer"
+                  signerRole="Recording Secretary"
+                  signerName="Maria Cloete"
+                />
               </div>
             </div>
           ) : (

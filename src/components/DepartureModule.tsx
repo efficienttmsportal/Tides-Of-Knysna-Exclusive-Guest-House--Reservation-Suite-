@@ -16,6 +16,7 @@ import {
 import { DocumentActionBar } from './DocumentActionBar';
 import { DepartureRecord, Reservation } from '../types';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
 
 interface DepartureModuleProps {
   reservations: Reservation[];
@@ -348,6 +349,34 @@ export const DepartureModule: React.FC<DepartureModuleProps> = ({ reservations }
                   className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50"
                 ></textarea>
               </div>
+            </div>
+
+            {/* Departure Signatures */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              <DigitalSignatureBlock
+                title="Guest Departure Clearance Signature"
+                signerRole="Guest Signatory"
+                signerName={activeDep.guestName}
+                onSave={(sig) => {
+                  const updated = { ...activeDep, minibarSettled: true };
+                  setActiveDep(updated);
+                  setDepartures(departures.map(d => d.id === updated.id ? updated : d));
+                }}
+              />
+              <DigitalSignatureBlock
+                title="Estate Inspector & Deposit Sign-Off"
+                signerRole="Head of Guest Experience"
+                signerName="Eleanor Sterling"
+                onSave={(sig) => {
+                  const updated = { 
+                    ...activeDep, 
+                    roomInspectionDone: true, 
+                    breakageDepositRefunded: true 
+                  };
+                  setActiveDep(updated);
+                  setDepartures(departures.map(d => d.id === updated.id ? updated : d));
+                }}
+              />
             </div>
 
             {/* Signoff bar */}

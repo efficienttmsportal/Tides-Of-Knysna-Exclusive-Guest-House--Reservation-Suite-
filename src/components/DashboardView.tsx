@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   CheckSquare, 
@@ -24,13 +24,18 @@ import {
   AlertTriangle,
   FolderOpen,
   KeyRound,
-  Building2
+  Building2,
+  Star,
+  ThumbsUp,
+  MessageSquare,
+  Award
 } from 'lucide-react';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
 import { Reservation, UserAccount, InventoryItem } from '../types';
 import { DashboardKpiSummaryRow } from './DashboardKpiSummaryRow';
 import { CompanyInfoData } from './CompanyInfoModule';
 import { SeasonalOccupancyChart } from './SeasonalOccupancyChart';
+import { getStoredGuestSurveys, GuestSatisfactionRecord } from './GuestSatisfactionSurvey';
 
 interface DashboardViewProps {
   reservations: Reservation[];
@@ -57,6 +62,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalDepositsHeld = reservations
     .filter(r => r.breakageDepositStatus === 'Held')
     .reduce((acc, r) => acc + r.breakageDepositAmount, 0);
+
+  // Guest Satisfaction Survey Aggregate State
+  const [surveys, setSurveys] = useState<GuestSatisfactionRecord[]>(() => getStoredGuestSurveys());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSurveys(getStoredGuestSurveys());
+    };
+    window.addEventListener('tok_survey_updated', handleUpdate);
+    return () => window.removeEventListener('tok_survey_updated', handleUpdate);
+  }, []);
+
+  const totalSurveys = surveys.length;
+  const avgCleanliness = totalSurveys > 0
+    ? (surveys.reduce((acc, s) => acc + s.cleanlinessScore, 0) / totalSurveys).toFixed(1)
+    : '5.0';
+  const avgAmenities = totalSurveys > 0
+    ? (surveys.reduce((acc, s) => acc + s.amenitiesScore, 0) / totalSurveys).toFixed(1)
+    : '5.0';
+  const avgStaff = totalSurveys > 0
+    ? (surveys.reduce((acc, s) => acc + s.staffHelpfulnessScore, 0) / totalSurveys).toFixed(1)
+    : '5.0';
+  const avgOverall = totalSurveys > 0
+    ? (surveys.reduce((acc, s) => acc + s.overallScore, 0) / totalSurveys).toFixed(1)
+    : '5.0';
 
   const modules = [
     {
@@ -348,6 +378,123 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onSelectTab={onSelectTab}
         onOpenSupplierModal={onOpenSupplierModal}
       />
+
+      {/* 5-STAR GUEST SATISFACTION & ACCREDITATION AUDIT CARD */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 flex items-center justify-center font-bold shadow-xs">
+              <Award className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-amber-700">
+                  Guest Quality & Accreditation Metrics
+                </span>
+                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                  TGCSA 5-Star Graded
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 font-serif-luxury">
+                Guest Satisfaction Survey Aggregate Scores ({totalSurveys} Verified Resident Reviews)
+              </h3>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => onSelectTab('inventory-forecast')}
+              className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              title="View consumables demand forecast correlated with guest cleanliness & amenity feedback"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-amber-700" />
+              Stock Forecast & Feedback
+            </button>
+            <button
+              onClick={() => onSelectTab('guestportal')}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              Open Guest Portal Survey
+            </button>
+            <button
+              onClick={() => onSelectTab('employees')}
+              className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              Staff Shift Calendar
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Score Metric Tiles */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Overall Satisfaction</span>
+            <div className="flex items-center justify-center gap-1 text-amber-500">
+              <Star className="w-5 h-5 fill-amber-400" />
+              <span className="text-2xl font-black text-slate-900 font-serif-luxury">{avgOverall}</span>
+              <span className="text-xs text-slate-400 font-mono">/ 5.0</span>
+            </div>
+            <span className="text-[11px] text-emerald-700 font-bold block">Superior 5-Star Standard</span>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Room Cleanliness</span>
+            <div className="text-2xl font-black text-slate-900 font-serif-luxury">
+              {avgCleanliness} <span className="text-xs text-slate-400 font-mono font-normal">/ 5.0</span>
+            </div>
+            <span className="text-[11px] text-slate-500 block">600TC Linen & Hygiene</span>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Amenities & Comfort</span>
+            <div className="text-2xl font-black text-slate-900 font-serif-luxury">
+              {avgAmenities} <span className="text-xs text-slate-400 font-mono font-normal">/ 5.0</span>
+            </div>
+            <span className="text-[11px] text-slate-500 block">Wi-Fi, Spa, Nespresso & Plunge</span>
+          </div>
+
+          <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 text-center space-y-1">
+            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Staff Helpfulness</span>
+            <div className="text-2xl font-black text-emerald-950 font-serif-luxury">
+              {avgStaff} <span className="text-xs text-emerald-700 font-mono font-normal">/ 5.0</span>
+            </div>
+            <span className="text-[11px] text-emerald-700 font-bold block">Concierge & Housekeeping Care</span>
+          </div>
+        </div>
+
+        {/* Recent Resident Reviews & Staff Commendations */}
+        <div className="pt-2 space-y-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+            Latest Guest Testimonials & Staff Commendations:
+          </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {surveys.slice(0, 2).map((s) => (
+              <div key={s.id} className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <strong className="text-slate-900">{s.guestName}</strong>
+                    <span className="text-[10px] text-slate-500">• Room {s.roomNumber}</span>
+                  </div>
+                  <div className="flex items-center gap-0.5 text-amber-500">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" />
+                    <span className="font-bold text-[11px] text-slate-800">{s.overallScore}</span>
+                  </div>
+                </div>
+                <p className="text-slate-600 italic text-[11px] line-clamp-2">
+                  "{s.comments}"
+                </p>
+                {s.staffMemberMentioned && (
+                  <div className="text-[10.5px] text-emerald-800 font-semibold pt-0.5">
+                    ⭐ Commendation: {s.staffMemberMentioned}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Main Suite Modules Grid */}
       <div>

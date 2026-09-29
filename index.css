@@ -16,21 +16,57 @@
 }
 
 @media print {
+  @page {
+    margin: 12mm 15mm;
+    size: auto;
+  }
+  
   body {
-    background-color: white !important;
-    color: black !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .no-print {
+  
+  .no-print,
+  nav,
+  header,
+  footer,
+  button:not(.printable-btn),
+  .toast,
+  #header-status-bar {
     display: none !important;
   }
-  .printable-area {
+
+  .printable-area,
+  .print-container {
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
     width: 100% !important;
+  }
+
+  /* Prevent page breaks inside cards, tables, and signature blocks */
+  .card,
+  tr,
+  table,
+  .rounded-2xl,
+  .rounded-3xl,
+  .border,
+  img,
+  canvas {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Universal Print & Inkjet contrast optimization */
+  h1, h2, h3, h4, h5, h6, strong {
+    color: #000000 !important;
+  }
+
+  p, span, td, th {
+    color: #1e293b !important;
   }
 }
 

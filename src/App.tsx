@@ -22,6 +22,7 @@ import { SupplierQuickContactModal } from './components/SupplierQuickContactModa
 import { InventoryChartsSection } from './components/InventoryChartsSection';
 import { PredictiveOrderDateCalculatorModal } from './components/PredictiveOrderDateCalculatorModal';
 import { StockAuditLogModal } from './components/StockAuditLogModal';
+import { InventoryForecastingModule } from './components/InventoryForecastingModule';
 import { calculateOrderDate } from './utils/predictiveOrderCalculator';
 import { 
   UserAccount, 
@@ -74,7 +75,9 @@ import {
   Percent,
   DollarSign,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Star,
+  MessageSquare
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -276,6 +279,7 @@ export const App: React.FC = () => {
   const lowStockCount = inventory.filter(i => i.howManyOnHand <= i.whenToReorder).length;
 
   // Inventory Table Search & Filter States
+  const [inventorySubTab, setInventorySubTab] = useState<'matrix' | 'forecast' | 'feedback'>('matrix');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('All');
   const [inventoryStockStatusFilter, setInventoryStockStatusFilter] = useState<'All' | 'LowStock' | 'Adequate'>('All');

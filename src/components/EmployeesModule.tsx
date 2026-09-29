@@ -47,6 +47,7 @@ import { SalesPerformanceDashboard } from './SalesPerformanceDashboard';
 import { PerformanceSummaryRow } from './PerformanceSummaryRow';
 import { ClearRecordsModal } from './ClearRecordsModal';
 import { DeleteEmployeeModal } from './DeleteEmployeeModal';
+import { getStoredGuestSurveys, GuestSatisfactionRecord } from './GuestSatisfactionSurvey';
 import { 
   EmployeeContact, 
   EmployeePayslip, 
@@ -85,14 +86,14 @@ const DEFAULT_SHIFTS: ShiftEntry[] = [
 
 export interface EmployeesModuleProps {
   reservations?: Reservation[];
-  defaultTab?: 'contacts' | 'payslips' | 'letters' | 'leave' | 'sales';
+  defaultTab?: 'contacts' | 'payslips' | 'letters' | 'leave' | 'sales' | 'shifts';
 }
 
 export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
   reservations = [],
   defaultTab = 'sales'
 }) => {
-  const [activeTab, setActiveTab] = useState<'contacts' | 'payslips' | 'letters' | 'leave' | 'sales'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'contacts' | 'payslips' | 'letters' | 'leave' | 'sales' | 'shifts'>(defaultTab);
 
   // STORAGE KEYS FOR PERSISTENCE
   const EMPLOYEES_STORAGE_KEY = 'tok_employees_v2';
@@ -835,6 +836,19 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
           >
             <CalendarDays className="w-3.5 h-3.5" />
             Leave Request Forms
+          </button>
+
+          <button
+            id="tab-emp-shifts"
+            onClick={() => setActiveTab('shifts')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === 'shifts'
+                ? 'bg-amber-400 text-slate-950 font-bold shadow-md'
+                : 'bg-amber-950/40 text-amber-200 border border-amber-600/40 hover:bg-amber-900/60'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            Shift Calendar & Guest CSAT Reviews
           </button>
         </div>
       </div>
@@ -2852,6 +2866,158 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
       {activeTab === 'sales' && (
         <SalesPerformanceDashboard reservations={reservations} />
       )}
+
+      {/* ========================================================================= */}
+      {/* 6. STAFF SHIFT CALENDAR & GUEST CSAT REVIEWS                              */}
+      {/* ========================================================================= */}
+      {activeTab === 'shifts' && (() => {
+        const storedSurveys = getStoredGuestSurveys();
+        const totalSurv = storedSurveys.length;
+        const avgStaffHelp = totalSurv > 0
+          ? (storedSurveys.reduce((acc, s) => acc + s.staffHelpfulnessScore, 0) / totalSurv).toFixed(1)
+          : '5.0';
+        const avgClean = totalSurv > 0
+          ? (storedSurveys.reduce((acc, s) => acc + s.cleanlinessScore, 0) / totalSurv).toFixed(1)
+          : '5.0';
+
+        const shiftSlots = [
+          { shiftName: 'Morning Reception & Breakfast Briefing', time: '06:30 - 15:00', defaultStaff: 'Maria Cloete', role: 'Housekeeping & Welcome Protocol' },
+          { shiftName: 'Executive Day Operations & Concierge', time: '08:00 - 17:00', defaultStaff: 'Eleanor Sterling', role: 'Duty Manager & Excursion Bookings' },
+          { shiftName: 'Sunset Terrace & F&B Lounge Service', time: '14:00 - 22:30', defaultStaff: 'Liam Vance', role: 'F&B Director & Lagoon Sundowners' },
+          { shiftName: 'Night Security & Late Check-In Roster', time: '22:00 - 07:00', defaultStaff: 'Sipho Ndlovu', role: 'Night Duty & Keycard Escort' }
+        ];
+
+        return (
+          <div className="space-y-6">
+            <DocumentActionBar
+              documentTitle="Staff Shift Calendar & Duty Roster"
+              documentNumber="ROST-2026-WK39"
+              onSave={() => showToast('Staff shift roster and guest satisfaction metrics saved.')}
+            />
+
+            {/* Top Quality & Staff CSAT Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-emerald-950 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-2 bg-amber-500/20 text-amber-300 rounded-xl border border-amber-500/30">
+                      <Clock className="w-5 h-5" />
+                    </span>
+                    <h3 className="font-serif-luxury font-bold text-lg text-white">
+                      Hospitality Shift Calendar & Resident Guest Reviews
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Live operational duty schedule synchronized with resident guest satisfaction ratings and staff commendations.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-slate-700 text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Staff Helpfulness CSAT</span>
+                    <span className="text-xl font-black text-amber-400 font-serif-luxury">{avgStaffHelp} / 5.0</span>
+                  </div>
+                  <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-slate-700 text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Cleanliness Index</span>
+                    <span className="text-xl font-black text-emerald-400 font-serif-luxury">{avgClean} / 5.0</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2">
+                <span>Roster Week: 28 September - 04 October 2026</span>
+                <span className="text-emerald-400">✓ Fully Staffed & Graded 5-Star Service Standard</span>
+              </div>
+            </div>
+
+            {/* Shift Calendar Grid */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  Weekly Duty Shifts & On-Call Coverage
+                </h4>
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print Shift Roster (Laser/Inkjet)
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {shiftSlots.map((slot, idx) => (
+                  <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-xs">{slot.shiftName}</span>
+                      <span className="text-[10px] font-mono font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded">
+                        {slot.time}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Assigned Team Member</span>
+                        <strong className="text-slate-900">{slot.defaultStaff}</strong>
+                      </div>
+                      <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                        {slot.role}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Guest Satisfaction Feedback Tied to Shifts */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-500" />
+                    Resident Guest Commendations Awarded to Shift Staff
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Real-time feedback captured from the Guest Satisfaction Survey module.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                  {storedSurveys.length} Verified Entries
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {storedSurveys.map((surv) => (
+                  <div key={surv.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <strong className="text-slate-900">{surv.guestName}</strong>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-500">Suite {surv.roomNumber} ({surv.roomAllocation})</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-[10px] font-mono text-slate-400">{surv.timestamp}</span>
+                      </div>
+                      <p className="text-slate-600 italic">"{surv.comments}"</p>
+                      {surv.staffMemberMentioned && (
+                        <div className="text-[11px] text-emerald-800 font-bold flex items-center gap-1 pt-0.5">
+                          ⭐ Commendation: {surv.staffMemberMentioned}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block font-bold">Staff Helpfulness</span>
+                        <span className="text-sm font-black text-amber-600">{surv.staffHelpfulnessScore} / 5</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Clear Records & Staff Data Maintenance Modal */}
       <ClearRecordsModal
