@@ -247,7 +247,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 28,
     unit: "Pcs",
     supplier: "Knysna Linen Mills",
-    lastRestocked: "2026-09-10"
+    lastRestocked: "2026-09-10",
+    location: "Main Linen Storeroom Alpha",
+    priority: "High"
   },
   {
     id: "inv-002",
@@ -260,7 +262,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 60,
     unit: "Pcs",
     supplier: "Knysna Linen Mills",
-    lastRestocked: "2026-09-12"
+    lastRestocked: "2026-09-12",
+    location: "Housekeeping Utility Bay",
+    priority: "High"
   },
   {
     id: "inv-003",
@@ -273,7 +277,10 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 18, // Alert triggered!
     unit: "Bottles",
     supplier: "Cape Botanical Essentials",
-    lastRestocked: "2026-08-28"
+    lastRestocked: "2026-08-28",
+    expiryDate: "2026-10-15",
+    location: "Suite 101-106 Amenities Pantry",
+    priority: "High"
   },
   {
     id: "inv-004",
@@ -286,7 +293,10 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 32,
     unit: "Bottles",
     supplier: "Garden Route Wine Merchants",
-    lastRestocked: "2026-09-15"
+    lastRestocked: "2026-09-15",
+    expiryDate: "2026-12-31",
+    location: "Main Bar Cellar",
+    priority: "Medium"
   },
   {
     id: "inv-005",
@@ -299,7 +309,10 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 55,
     unit: "Jars",
     supplier: "Wild Oats Artisan Co-op",
-    lastRestocked: "2026-09-18"
+    lastRestocked: "2026-09-18",
+    expiryDate: "2026-10-20",
+    location: "Kitchen Breakfast Pantry",
+    priority: "Medium"
   },
   {
     id: "inv-006",
@@ -312,7 +325,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 5, // Alert triggered!
     unit: "Drums",
     supplier: "Green Clean Garden Route",
-    lastRestocked: "2026-09-02"
+    lastRestocked: "2026-09-02",
+    location: "Basement Cleaning Station",
+    priority: "High"
   },
   {
     id: "inv-007",
@@ -325,7 +340,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     howManyOnHand: 7,
     unit: "Tins",
     supplier: "Knysna Maritime Timber Supplies",
-    lastRestocked: "2026-08-15"
+    lastRestocked: "2026-08-15",
+    location: "Technical Maintenance Locker",
+    priority: "Low"
   }
 ];
 

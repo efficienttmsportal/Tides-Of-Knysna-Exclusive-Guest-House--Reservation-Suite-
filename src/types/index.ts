@@ -105,6 +105,9 @@ export interface InventoryItem {
   unit: string;
   supplier: string;
   lastRestocked: string;
+  expiryDate?: string;
+  location?: string;
+  priority?: 'Low' | 'Medium' | 'High';
   dailyConsumptionRate?: number;
   leadTimeDays?: number;
   predictedOrderDate?: string;

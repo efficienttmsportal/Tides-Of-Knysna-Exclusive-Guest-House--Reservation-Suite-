@@ -19,6 +19,8 @@ import { MeetingMinutesModule } from './components/MeetingMinutesModule';
 import { InventoryNotificationSystem } from './components/InventoryNotificationSystem';
 import { InventoryQrModal } from './components/InventoryQrModal';
 import { SupplierQuickContactModal } from './components/SupplierQuickContactModal';
+import { SupplierPerformanceModule } from './components/SupplierPerformanceModule';
+import { DraftPurchaseOrderModal } from './components/DraftPurchaseOrderModal';
 import { InventoryChartsSection } from './components/InventoryChartsSection';
 import { PredictiveOrderDateCalculatorModal } from './components/PredictiveOrderDateCalculatorModal';
 import { StockAuditLogModal } from './components/StockAuditLogModal';
@@ -279,7 +281,132 @@ export const App: React.FC = () => {
   const lowStockCount = inventory.filter(i => i.howManyOnHand <= i.whenToReorder).length;
 
   // Inventory Table Search & Filter States
-  const [inventorySubTab, setInventorySubTab] = useState<'matrix' | 'forecast' | 'feedback'>('matrix');
+  const [inventorySubTab, setInventorySubTab] = useState<'matrix' | 'forecast' | 'feedback' | 'supplier_performance'>('matrix');
+  const [isDraftPoModalOpen, setIsDraftPoModalOpen] = useState(false);
+  const [lastItemAdjustments, setLastItemAdjustments] = useState<{ [itemId: string]: { previousQty: number; newQty: number; timestamp: number } }>({});
+  const [damagedPromptItem, setDamagedPromptItem] = useState<InventoryItem | null>(null);
+  const [reservedPromptItem, setReservedPromptItem] = useState<InventoryItem | null>(null);
+  const [supplierInfoModalItem, setSupplierInfoModalItem] = useState<InventoryItem | null>(null);
+  const [moveLocationItem, setMoveLocationItem] = useState<InventoryItem | null>(null);
+  const [newLocationInput, setNewLocationInput] = useState('');
+  const [rowRestockAmounts, setRowRestockAmounts] = useState<{ [itemId: string]: number }>({});
+  const [adjustmentNoteInput, setAdjustmentNoteInput] = useState('');
+
+  const handleMoveLocation = (item: InventoryItem, targetLocation: string) => {
+    if (!targetLocation.trim()) return;
+    const prevLocation = item.location || 'Main Store';
+    const updated = inventory.map(i => i.id === item.id ? { ...i, location: targetLocation.trim() } : i);
+    setInventory(updated);
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: item.howManyOnHand,
+      newQty: item.howManyOnHand,
+      deltaQty: 0,
+      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+      actionType: 'Location Transfer',
+      notes: `Transferred storage location from "${prevLocation}" to "${targetLocation.trim()}"`
+    });
+    setMoveLocationItem(null);
+    setNewLocationInput('');
+  };
+
+  const handleUpdatePriority = (item: InventoryItem, newPriority: 'Low' | 'Medium' | 'High') => {
+    const prevPriority = item.priority || 'Medium';
+    const updated = inventory.map(i => i.id === item.id ? { ...i, priority: newPriority } : i);
+    setInventory(updated);
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: item.howManyOnHand,
+      newQty: item.howManyOnHand,
+      deltaQty: 0,
+      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+      actionType: 'Priority Level Updated',
+      notes: `Changed priority level from "${prevPriority}" to "${newPriority}"`
+    });
+  };
+
+  const handleMarkDamaged = (item: InventoryItem, note: string) => {
+    const prev = item.howManyOnHand;
+    const next = Math.max(0, prev - 1);
+    const updated = inventory.map(i => i.id === item.id ? { ...i, howManyOnHand: next } : i);
+    setInventory(updated);
+    setLastItemAdjustments(prevMap => ({
+      ...prevMap,
+      [item.id]: { previousQty: prev, newQty: next, timestamp: Date.now() }
+    }));
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: prev,
+      newQty: next,
+      deltaQty: -1,
+      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+      actionType: 'Marked as Damaged/Discarded',
+      notes: note ? `Damaged note: ${note}` : 'Marked as damaged / discarded item'
+    });
+    setDamagedPromptItem(null);
+    setAdjustmentNoteInput('');
+  };
+
+  const handleMarkReserved = (item: InventoryItem, note: string) => {
+    const prev = item.howManyOnHand;
+    const next = Math.max(0, prev - 1);
+    const updated = inventory.map(i => i.id === item.id ? { ...i, howManyOnHand: next } : i);
+    setInventory(updated);
+    setLastItemAdjustments(prevMap => ({
+      ...prevMap,
+      [item.id]: { previousQty: prev, newQty: next, timestamp: Date.now() }
+    }));
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: prev,
+      newQty: next,
+      deltaQty: -1,
+      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+      actionType: 'Reserved for Guest',
+      notes: note ? `Reserved note: ${note}` : 'Reserved for guest stay'
+    });
+    setReservedPromptItem(null);
+    setAdjustmentNoteInput('');
+  };
+
+  const handleUndoAdjustment = (itemId: string) => {
+    const adj = lastItemAdjustments[itemId];
+    if (!adj) return;
+    const item = inventory.find(i => i.id === itemId);
+    if (!item) return;
+
+    const prev = item.howManyOnHand;
+    const next = adj.previousQty;
+    const updated = inventory.map(i => i.id === itemId ? { ...i, howManyOnHand: next } : i);
+    setInventory(updated);
+
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: prev,
+      newQty: next,
+      deltaQty: next - prev,
+      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+      actionType: 'Undo Inventory Adjustment',
+      notes: `Reversed previous inventory action (Restored from ${prev} to ${next})`
+    });
+
+    setLastItemAdjustments(prevMap => {
+      const copy = { ...prevMap };
+      delete copy[itemId];
+      return copy;
+    });
+  };
+
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('All');
   const [inventoryStockStatusFilter, setInventoryStockStatusFilter] = useState<'All' | 'LowStock' | 'Adequate'>('All');
@@ -762,27 +889,104 @@ export const App: React.FC = () => {
               onSave={() => alert('Stock levels verified and updated.')}
             />
 
-            {/* Notification System for Reorder Alerts & Revenue Forecasting */}
-            <InventoryNotificationSystem
-              inventory={inventory}
-              onUpdateInventory={setInventory}
-              reservations={reservations}
-              companyInfo={companyInfo}
-              onOpenAccounting={() => setActiveTab('accounting')}
-            />
+            {/* Inventory Sub-Tab Navigation Bar */}
+            <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs overflow-x-auto">
+              <button
+                onClick={() => setInventorySubTab('matrix')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  inventorySubTab === 'matrix' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
+                Stock Control Matrix
+              </button>
+              <button
+                onClick={() => setInventorySubTab('forecast')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  inventorySubTab === 'forecast' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                Inventory Forecasting
+              </button>
+              <button
+                onClick={() => setInventorySubTab('feedback')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  inventorySubTab === 'feedback' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 text-indigo-400" />
+                Digital Guest Feedback & Audit
+              </button>
+              <button
+                onClick={() => setInventorySubTab('supplier_performance')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  inventorySubTab === 'supplier_performance' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Truck className="w-4 h-4 text-amber-400" />
+                Supplier Performance & Analytics
+              </button>
 
-            {/* Comprehensive Visual Inventory Analytics & Health Charts */}
-            <InventoryChartsSection
-              inventory={inventory}
-              onSelectCategoryFilter={(cat) => setInventoryCategoryFilter(cat)}
-              onOpenSupplierModal={(sup) => setQuickContactSupplier({ name: sup })}
-              onOpenPredictiveCalculator={(item) => {
-                setPredictiveCalculatorItem(item || null);
-                setIsPredictiveCalculatorOpen(true);
-              }}
-            />
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => setIsDraftPoModalOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-emerald-700 hover:from-teal-500 hover:to-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition whitespace-nowrap"
+                  title="Generate Draft Purchase Order for low stock items"
+                >
+                  <Mail className="w-3.5 h-3.5 text-teal-200" />
+                  Generate Draft PO ({lowStockCount})
+                </button>
+              </div>
+            </div>
 
-            {/* Stock Control Matrix with Interactive Adjustments */}
+            {inventorySubTab === 'forecast' && (
+              <InventoryForecastingModule
+                inventory={inventory}
+                reservations={reservations}
+                initialTab="forecast"
+              />
+            )}
+
+            {inventorySubTab === 'feedback' && (
+              <InventoryForecastingModule
+                inventory={inventory}
+                reservations={reservations}
+                initialTab="feedback_correlator"
+              />
+            )}
+
+            {inventorySubTab === 'supplier_performance' && (
+              <SupplierPerformanceModule
+                inventory={inventory}
+                onOpenSupplierModal={(sup) => setQuickContactSupplier({ name: sup })}
+                onGenerateDraftPo={() => setIsDraftPoModalOpen(true)}
+              />
+            )}
+
+            {inventorySubTab === 'matrix' && (
+              <>
+                {/* Notification System for Reorder Alerts & Revenue Forecasting */}
+                <InventoryNotificationSystem
+                  inventory={inventory}
+                  onUpdateInventory={setInventory}
+                  reservations={reservations}
+                  companyInfo={companyInfo}
+                  onOpenAccounting={() => setActiveTab('accounting')}
+                />
+
+                {/* Comprehensive Visual Inventory Analytics & Health Charts */}
+                <InventoryChartsSection
+                  inventory={inventory}
+                  onSelectCategoryFilter={(cat) => setInventoryCategoryFilter(cat)}
+                  onOpenSupplierModal={(sup) => setQuickContactSupplier({ name: sup })}
+                  onOpenPredictiveCalculator={(item) => {
+                    setPredictiveCalculatorItem(item || null);
+                    setIsPredictiveCalculatorOpen(true);
+                  }}
+                />
+
+                {/* Stock Control Matrix with Interactive Adjustments */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
                 <div className="flex items-center gap-3">
@@ -1138,6 +1342,7 @@ export const App: React.FC = () => {
                       <th className="px-3 py-2.5">Description</th>
                       <th className="px-3 py-2.5">Category</th>
                       <th className="px-3 py-2.5">Supplier</th>
+                      <th className="px-3 py-2.5">Location</th>
                       <th className="px-3 py-2.5">Price / Unit</th>
                       <th className="px-3 py-2.5">On Hand</th>
                       <th className="px-3 py-2.5">Reorder Level</th>
@@ -1171,13 +1376,16 @@ export const App: React.FC = () => {
                       filteredInventory.map(item => {
                         const isLow = item.howManyOnHand <= item.whenToReorder;
                         const isSelected = selectedItemIds.includes(item.id);
+                        const priority = item.priority || 'Medium';
+                        const priorityBgClass = isSelected ? 'bg-emerald-50/85' :
+                                               priority === 'High' ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-500' :
+                                               priority === 'Medium' ? 'bg-amber-50/30 hover:bg-amber-50/50 border-l-4 border-l-amber-400' :
+                                               'hover:bg-slate-50 border-l-4 border-l-slate-300';
 
                         return (
                           <tr 
                             key={item.id} 
-                            className={`transition ${
-                              isSelected ? 'bg-emerald-50/80' : 'hover:bg-slate-50'
-                            }`}
+                            className={`transition ${priorityBgClass}`}
                           >
                             <td className="px-3 py-2 text-center">
                               <input
@@ -1206,11 +1414,17 @@ export const App: React.FC = () => {
                                 <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-emerald-600 shrink-0 transition" />
                               </button>
                             </td>
+                            <td className="px-3 py-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1 w-max">
+                                <MapPin className="w-2.5 h-2.5 text-purple-600" />
+                                {item.location || 'Main Store'}
+                              </span>
+                            </td>
                             <td className="px-3 py-2 font-bold text-slate-800">R {item.pricePerUnit}</td>
                             <td className="px-3 py-2 font-bold text-slate-900">{item.howManyOnHand} {item.unit}</td>
                             <td className="px-3 py-2 text-slate-500">{item.whenToReorder} {item.unit}</td>
                             <td className="px-3 py-2">
-                              <div className="flex items-center gap-1">
+                              <div className="inventory-table-row-actions flex items-center gap-1.5 flex-wrap">
                                 <button
                                   onClick={() => handleAdjustStock(item.id, -1)}
                                   className="w-6 h-6 rounded bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-600 font-bold flex items-center justify-center transition"
@@ -1232,6 +1446,82 @@ export const App: React.FC = () => {
                                 >
                                   +10
                                 </button>
+                                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase">Priority:</span>
+                                  <select
+                                    value={item.priority || 'Medium'}
+                                    onChange={(e) => handleUpdatePriority(item, e.target.value as 'Low' | 'Medium' | 'High')}
+                                    className={`text-[11px] font-bold px-2 py-1 rounded border outline-none cursor-pointer ${
+                                      (item.priority || 'Medium') === 'High' ? 'bg-rose-100 text-rose-900 border-rose-300' :
+                                      (item.priority || 'Medium') === 'Medium' ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                                      'bg-slate-100 text-slate-800 border-slate-300'
+                                    }`}
+                                    title="Set item replenishment priority level"
+                                  >
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                  </select>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setMoveLocationItem(item);
+                                    setNewLocationInput(item.location || 'Main Storeroom Alpha');
+                                  }}
+                                  className="px-2 h-6 rounded bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold text-[10px] flex items-center gap-1 transition border border-purple-200"
+                                  title="Reassign item storage location"
+                                >
+                                  <MapPin className="w-3 h-3 text-purple-600 shrink-0" />
+                                  Move Location
+                                </button>
+                                <button
+                                  onClick={() => setDamagedPromptItem(item)}
+                                  className="px-2 h-6 rounded bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-[10px] flex items-center gap-1 transition border border-rose-200"
+                                  title="Mark as Damaged / Discarded"
+                                >
+                                  ⚠️ Damaged
+                                </button>
+                                <button
+                                  onClick={() => setReservedPromptItem(item)}
+                                  className="px-2 h-6 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[10px] flex items-center gap-1 transition border border-indigo-200"
+                                  title="Reserved for Guest"
+                                >
+                                  🛌 Reserved
+                                </button>
+                                <button
+                                  onClick={() => setSupplierInfoModalItem(item)}
+                                  className="px-2 h-6 rounded bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-[10px] flex items-center gap-1 transition border border-sky-200"
+                                  title="View Supplier Info, Lead Time, and Reliability Rating"
+                                >
+                                  <Truck className="w-3 h-3 text-sky-600 shrink-0" />
+                                  Supplier Info
+                                </button>
+                                {lastItemAdjustments[item.id] && (
+                                  <button
+                                    onClick={() => handleUndoAdjustment(item.id)}
+                                    className="px-2 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[10px] flex items-center gap-1 transition animate-bounce border border-amber-300"
+                                    title="Undo last inventory adjustment"
+                                  >
+                                    ↩️ Undo
+                                  </button>
+                                )}
+                                {item.expiryDate && (() => {
+                                  const today = new Date();
+                                  const exp = new Date(item.expiryDate);
+                                  const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                  const isExpiringSoon = diffDays <= 30;
+                                  return (
+                                    <span 
+                                      className={`px-2 h-6 rounded text-[10px] font-bold flex items-center gap-1 border ${
+                                        isExpiringSoon ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                      }`}
+                                      title={`Expiry Date: ${item.expiryDate} (${diffDays} days remaining)`}
+                                    >
+                                      {isExpiringSoon && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
+                                      📅 Expiry: {item.expiryDate}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td className="px-3 py-2 text-center">
@@ -1745,6 +2035,280 @@ export const App: React.FC = () => {
                 onClose={() => setQuickContactSupplier(null)}
                 onQuickRestockItem={(itemId, qty) => handleAdjustStock(itemId, qty)}
               />
+            )}
+              </>
+            )}
+
+            {/* DAMAGED / DISCARDED PROMPT MODAL */}
+            {damagedPromptItem && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">⚠️</div>
+                      <h4 className="font-serif-luxury font-bold text-slate-900 text-base">Mark Item as Damaged / Discarded</h4>
+                    </div>
+                    <button onClick={() => setDamagedPromptItem(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Adjusting stock down by 1 unit for <strong className="text-slate-900">{damagedPromptItem.itemCode} - {damagedPromptItem.itemDescription}</strong>. This will be recorded in the Stock Audit Log.
+                  </p>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Optional Note / Reason
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Broken in suite #204, stained, or expired"
+                      value={adjustmentNoteInput}
+                      onChange={(e) => setAdjustmentNoteInput(e.target.value)}
+                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
+                    />
+                  </div>
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setDamagedPromptItem(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleMarkDamaged(damagedPromptItem, adjustmentNoteInput)}
+                      className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition shadow-md"
+                    >
+                      Confirm Damaged (-1 Unit)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* RESERVED FOR GUEST PROMPT MODAL */}
+            {reservedPromptItem && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">🛌</div>
+                      <h4 className="font-serif-luxury font-bold text-slate-900 text-base">Reserve Stock for Guest Stay</h4>
+                    </div>
+                    <button onClick={() => setReservedPromptItem(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Allocating 1 unit for <strong className="text-slate-900">{reservedPromptItem.itemCode} - {reservedPromptItem.itemDescription}</strong> to guest suite turnover.
+                  </p>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Optional Guest / Suite Note
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. VIP guest suite #101 requested extra linen / toiletries"
+                      value={adjustmentNoteInput}
+                      onChange={(e) => setAdjustmentNoteInput(e.target.value)}
+                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setReservedPromptItem(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleMarkReserved(reservedPromptItem, adjustmentNoteInput)}
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-md"
+                    >
+                      Confirm Reserved (-1 Unit)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DRAFT PURCHASE ORDER MODAL */}
+            <DraftPurchaseOrderModal
+              isOpen={isDraftPoModalOpen}
+              onClose={() => setIsDraftPoModalOpen(false)}
+              inventory={inventory}
+              companyInfo={companyInfo}
+              onConfirmOrderSent={(orderedIds) => {
+                orderedIds.forEach(id => {
+                  const itm = inventory.find(i => i.id === id);
+                  if (itm) {
+                    appendAuditLog({
+                      itemId: itm.id,
+                      itemCode: itm.itemCode,
+                      itemDescription: itm.itemDescription,
+                      previousQty: itm.howManyOnHand,
+                      newQty: itm.howManyOnHand,
+                      deltaQty: 0,
+                      adjustedBy: `${currentUser?.name || 'Staff'} (${currentUser?.role || 'operator'})`,
+                      actionType: 'Draft Purchase Order Generated',
+                      notes: `Compiled into supplier email draft PO for ${itm.supplier}`
+                    });
+                  }
+                });
+              }}
+            />
+
+            {/* SUPPLIER INFO MINI-CARD MODAL */}
+            {supplierInfoModalItem && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold">
+                        <Truck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif-luxury font-bold text-slate-900 text-base">
+                          {supplierInfoModalItem.supplier}
+                        </h4>
+                        <p className="text-xs text-slate-500">Approved Vendor Performance & Contact Profile</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setSupplierInfoModalItem(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-semibold">Associated Stock Item:</span>
+                        <span className="font-mono font-bold text-slate-800">{supplierInfoModalItem.itemCode}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-semibold">Description:</span>
+                        <span className="font-bold text-slate-900 truncate max-w-[200px]">{supplierInfoModalItem.itemDescription}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-semibold">Last Contact / Restock Date:</span>
+                        <span className="font-bold text-indigo-700 font-mono">{supplierInfoModalItem.lastRestocked}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                        <span className="text-[10px] text-emerald-800 font-bold uppercase block">Lead Time</span>
+                        <span className="text-sm font-bold text-emerald-950 font-mono">2.2 Days</span>
+                      </div>
+                      <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                        <span className="text-[10px] text-emerald-800 font-bold uppercase block">Fulfillment</span>
+                        <span className="text-sm font-bold text-emerald-950 font-mono">98.2%</span>
+                      </div>
+                      <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                        <span className="text-[10px] text-emerald-800 font-bold uppercase block">Rating</span>
+                        <span className="text-sm font-bold text-emerald-950 font-mono">4.9 ★</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        const sup = supplierInfoModalItem.supplier;
+                        const itm = supplierInfoModalItem;
+                        setSupplierInfoModalItem(null);
+                        setQuickContactSupplier({ name: sup, item: itm });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Open Quick Contact / PO
+                    </button>
+                    <button
+                      onClick={() => setSupplierInfoModalItem(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MOVE TO LOCATION MODAL */}
+            {moveLocationItem && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif-luxury font-bold text-slate-900 text-base">
+                          Reassign Storage Location
+                        </h4>
+                        <p className="text-xs text-slate-500">{moveLocationItem.itemCode} - {moveLocationItem.itemDescription}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setMoveLocationItem(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Current Location:
+                      </label>
+                      <div className="p-2.5 bg-slate-100 text-slate-800 font-semibold rounded-xl border border-slate-200">
+                        {moveLocationItem.location || 'Main Storeroom Alpha'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Select Preset or Type New Location
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 mb-2">
+                        {['Main Storeroom Alpha', 'Suite 101 Pantry', 'Suite 102 Penthouse', 'Main Bar Cellar', 'Breakfast Kitchen', 'Housekeeping Locker'].map(loc => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => setNewLocationInput(loc)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold text-left transition border ${
+                              newLocationInput === loc ? 'bg-purple-50 border-purple-400 text-purple-900 shadow-xs' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="e.g. Suite 103 Executive Suite Pantry"
+                        value={newLocationInput}
+                        onChange={(e) => setNewLocationInput(e.target.value)}
+                        className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 outline-none font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                    <button
+                      onClick={() => setMoveLocationItem(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleMoveLocation(moveLocationItem, newLocationInput)}
+                      className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition shadow-md"
+                    >
+                      Confirm Transfer
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
