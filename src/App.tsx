@@ -383,6 +383,7 @@ export const App: React.FC = () => {
   const [newLocationInput, setNewLocationInput] = useState('');
   const [rowRestockAmounts, setRowRestockAmounts] = useState<{ [itemId: string]: number }>({});
   const [adjustmentNoteInput, setAdjustmentNoteInput] = useState('');
+  const [isRowHeightened, setIsRowHeightened] = useState(false);
 
   const handleMoveLocation = (item: InventoryItem, targetLocation: string) => {
     if (!targetLocation.trim()) return;
@@ -610,6 +611,12 @@ export const App: React.FC = () => {
 
   // Stock item count adjustment helper with automatic audit logging
   const handleAdjustStock = (id: string, delta: number, actionType: any = 'Manual Adjustment', notes?: string) => {
+    const targetItem = inventory.find(i => i.id === id);
+    if (targetItem && targetItem.isLocked) {
+      alert(`⚠️ Item ${targetItem.itemCode} is locked for scheduled audit/count freeze. Unlock the item before making stock adjustments.`);
+      return;
+    }
+
     let oldItem: InventoryItem | undefined;
     let newItem: InventoryItem | undefined;
 
@@ -642,6 +649,22 @@ export const App: React.FC = () => {
         notes: notes || (delta > 0 ? `Stock replenishment (+${delta})` : `Stock unit consumed (${delta})`)
       });
     }
+  };
+
+  const handleToggleItemLock = (item: InventoryItem) => {
+    const nextLocked = !item.isLocked;
+    setInventory(prev => prev.map(i => i.id === item.id ? { ...i, isLocked: nextLocked } : i));
+    appendAuditLog({
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      previousQty: item.howManyOnHand,
+      newQty: item.howManyOnHand,
+      deltaQty: 0,
+      adjustedBy: currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Duty Operations Officer',
+      actionType: nextLocked ? 'Item Locked for Audit' : 'Item Unlocked',
+      notes: nextLocked ? 'Item locked for scheduled audit / inventory count freeze' : 'Item unlocked for regular operations'
+    });
   };
 
   // Bulk Selection & Batch Actions State
@@ -1275,6 +1298,15 @@ export const App: React.FC = () => {
                       {cat}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setIsRowHeightened(!isRowHeightened)}
+                    className={`ml-2 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1 transition shrink-0 ${
+                      isRowHeightened ? 'bg-indigo-600 text-white font-bold' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                    title="Toggle row heightening for enhanced reading and action comfort"
+                  >
+                    <span>↕️ {isRowHeightened ? 'Compact Rows' : 'Heighten Rows'}</span>
+                  </button>
                   {(inventorySearchQuery || inventoryCategoryFilter !== 'All' || inventoryStockStatusFilter !== 'All') && (
                     <button
                       onClick={() => {
@@ -1470,6 +1502,7 @@ export const App: React.FC = () => {
                         const isSelected = selectedItemIds.includes(item.id);
                         const priority = item.priority || 'Medium';
                         const priorityBgClass = isSelected ? 'bg-emerald-50/85' :
+                                               item.isLocked ? 'bg-amber-100/90 hover:bg-amber-100 border-l-4 border-l-amber-600 shadow-2xs' :
                                                priority === 'High' ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-500' :
                                                priority === 'Medium' ? 'bg-amber-50/30 hover:bg-amber-50/50 border-l-4 border-l-amber-400' :
                                                'hover:bg-slate-50 border-l-4 border-l-slate-300';
@@ -1477,7 +1510,7 @@ export const App: React.FC = () => {
                         return (
                           <tr 
                             key={item.id} 
-                            className={`transition ${priorityBgClass}`}
+                            className={`transition ${priorityBgClass} ${isRowHeightened ? 'h-16' : ''}`}
                           >
                             <td className="px-3 py-2 text-center">
                               <input
@@ -1517,6 +1550,15 @@ export const App: React.FC = () => {
                             <td className="px-3 py-2 text-slate-500">{item.whenToReorder} {item.unit}</td>
                             <td className="px-3 py-2">
                               <div className="inventory-table-row-actions flex items-center gap-1.5 flex-wrap">
+                                 <label className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 px-2 py-1 rounded border border-emerald-200 cursor-pointer text-[10px] font-bold transition mr-1" title="Select item for concurrent batch operations">
+                                   <input
+                                     type="checkbox"
+                                     checked={isSelected}
+                                     onChange={() => handleToggleSelectItem(item.id)}
+                                     className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                   />
+                                   <span>Apply to Batch</span>
+                                 </label>
                                 <button
                                   onClick={() => handleAdjustStock(item.id, -1)}
                                   className="w-6 h-6 rounded bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-600 font-bold flex items-center justify-center transition"

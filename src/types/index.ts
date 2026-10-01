@@ -113,6 +113,7 @@ export interface InventoryItem {
   leadTimeDays?: number;
   predictedOrderDate?: string;
   consumptionHistory?: number[];
+  isLocked?: boolean;
 }
 
 export interface StockAuditLogEntry {
