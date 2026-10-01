@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'guest' | 'staff';
 export interface UserAccount {
   id: string;
   fullName: string;
+  name?: string;
   username: string;
   email: string;
   role: UserRole;
@@ -111,6 +112,7 @@ export interface InventoryItem {
   dailyConsumptionRate?: number;
   leadTimeDays?: number;
   predictedOrderDate?: string;
+  consumptionHistory?: number[];
 }
 
 export interface StockAuditLogEntry {
@@ -123,7 +125,7 @@ export interface StockAuditLogEntry {
   newQty: number;
   deltaQty: number;
   adjustedBy: string; // e.g. "Eleanor Sterling (Head of Ops)", "Duty Officer", "Staff (QR Scanner)"
-  actionType: 'Manual Adjustment' | 'Batch Restock' | 'Batch Price Update' | 'QR Scan Adjustment' | 'Auto Threshold Restock' | 'Physical Stock Count' | 'Purchase Order Received';
+  actionType: 'Manual Adjustment' | 'Batch Restock' | 'Batch Price Update' | 'QR Scan Adjustment' | 'Auto Threshold Restock' | 'Physical Stock Count' | 'Purchase Order Received' | string;
   notes?: string;
 }
 

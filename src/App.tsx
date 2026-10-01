@@ -34,6 +34,7 @@ import {
   AttractionItem,
   StockAuditLogEntry 
 } from './types';
+import * as d3 from 'd3';
 import { 
   INITIAL_RESERVATIONS, 
   INITIAL_USERS, 
@@ -129,6 +130,97 @@ const INITIAL_STOCK_AUDIT_LOGS: StockAuditLogEntry[] = [
 const COMPANY_STORAGE_KEY = 'tok_exclusive_company_profile_v1';
 const RESERVATIONS_STORAGE_KEY = 'tok_reservations_v2';
 const INVENTORY_STORAGE_KEY = 'tok_inventory_v2';
+
+const D3Sparkline: React.FC<{ data: number[]; itemCode: string }> = ({ data, itemCode }) => {
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+
+  React.useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    const width = 76;
+    const height = 22;
+    const margin = { top: 2, right: 2, bottom: 2, left: 2 };
+
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const yMin = d3.min(data) ?? 0;
+    const yMax = d3.max(data) ?? 10;
+    const yMinAdjusted = Math.max(0, yMin - 2);
+    const yMaxAdjusted = yMax + 2;
+
+    const xScale = d3.scaleLinear()
+      .domain([0, data.length - 1])
+      .range([0, innerWidth]);
+
+    const yScale = d3.scaleLinear()
+      .domain([yMinAdjusted, yMaxAdjusted === yMinAdjusted ? yMaxAdjusted + 1 : yMaxAdjusted])
+      .range([innerHeight, 0]);
+
+    const line = d3.line<number>()
+      .x((_, i) => xScale(i))
+      .y(d => yScale(d))
+      .curve(d3.curveMonotoneX);
+
+    const area = d3.area<number>()
+      .x((_, i) => xScale(i))
+      .y0(innerHeight)
+      .y1(d => yScale(d))
+      .curve(d3.curveMonotoneX);
+
+    const defs = svg.append('defs');
+    const gradientId = `sparkline-gradient-${itemCode.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const gradient = defs.append('linearGradient')
+      .attr('id', gradientId)
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '0%')
+      .attr('y2', '100%');
+
+    gradient.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#10b981')
+      .attr('stop-opacity', '0.45');
+
+    gradient.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#10b981')
+      .attr('stop-opacity', '0.0');
+
+    g.append('path')
+      .datum(data)
+      .attr('fill', `url(#${gradientId})`)
+      .attr('d', area);
+
+    g.append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', '#047857')
+      .attr('stroke-width', '1.5')
+      .attr('d', line);
+
+    if (data.length > 0) {
+      const lastVal = data[data.length - 1];
+      g.append('circle')
+        .attr('cx', xScale(data.length - 1))
+        .attr('cy', yScale(lastVal))
+        .attr('r', 2.5)
+        .attr('fill', '#065f46');
+    }
+  }, [data, itemCode]);
+
+  return (
+    <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-emerald-200 shadow-2xs" title="D3 Sparkline: Last 7 days stock consumption trend">
+      <svg ref={svgRef} width="76" height="22" className="overflow-visible" />
+      <span className="text-[9px] font-extrabold text-emerald-800">7d Trend</span>
+    </div>
+  );
+};
 
 export const App: React.FC = () => {
   // Authentication & Current User
