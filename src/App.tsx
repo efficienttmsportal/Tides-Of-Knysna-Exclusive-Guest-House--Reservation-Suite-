@@ -80,7 +80,9 @@ import {
   TrendingUp,
   TrendingDown,
   Star,
-  MessageSquare
+  MessageSquare,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -895,11 +897,13 @@ export const App: React.FC = () => {
     if (selectedItemIds.length === 0) return;
     const selectedItems = inventory.filter(i => selectedItemIds.includes(i.id));
 
-    const headers = ['Item Code', 'Description', 'Category', 'Location', 'On Hand', 'Unit', 'Price (ZAR)', 'Last Adjustment Timestamp', 'Action Type', 'Adjusted By', 'Audit Notes'];
+    const headers = ['Item Code', 'Description', 'Category', 'Location', 'Lock Status', 'On Hand', 'Unit', 'Price (ZAR)', 'Last Adjustment Timestamp', 'Action Type', 'Adjusted By', 'Audit Notes'];
     const rows: string[] = [];
 
     selectedItems.forEach(item => {
-      const itemLogs = stockAuditLogs.filter(log => log.itemId === item.id);
+      const itemLogs = stockAuditLogs
+        .filter(log => log.itemId === item.id)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       if (itemLogs.length > 0) {
         itemLogs.forEach(log => {
           rows.push([
@@ -907,6 +911,7 @@ export const App: React.FC = () => {
             `"${item.itemDescription.replace(/"/g, '""')}"`,
             `"${item.category.replace(/"/g, '""')}"`,
             `"${item.location || 'Main Store'}"`,
+            `"${item.isLocked ? 'Locked' : 'Active'}"`,
             item.howManyOnHand,
             `"${item.unit}"`,
             item.pricePerUnit,
@@ -922,6 +927,7 @@ export const App: React.FC = () => {
           `"${item.itemDescription.replace(/"/g, '""')}"`,
           `"${item.category.replace(/"/g, '""')}"`,
           `"${item.location || 'Main Store'}"`,
+          `"${item.isLocked ? 'Locked' : 'Active'}"`,
           item.howManyOnHand,
           `"${item.unit}"`,
           item.pricePerUnit,
@@ -1538,14 +1544,23 @@ export const App: React.FC = () => {
                       Batch Audit Report
                     </button>
 
-                    {/* Batch Status Toggle */}
+                    {/* Batch Lock / Unlock */}
                     <button
                       onClick={handleBatchStatusToggle}
                       className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition"
-                      title="Toggle lock status across selected items to freeze or unfreeze stock counts"
+                      title="Batch Lock/Unlock: Freeze or unfreeze stock count adjustments on selected items"
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 text-amber-200" />
-                      Batch Status Toggle
+                      {selectedItemIds.length > 0 && inventory.filter(i => selectedItemIds.includes(i.id)).every(i => i.isLocked) ? (
+                        <>
+                          <Unlock className="w-3.5 h-3.5 text-amber-200" />
+                          Batch Unlock ({selectedItemIds.length})
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-amber-200" />
+                          Batch Lock/Unlock
+                        </>
+                      )}
                     </button>
 
                     {/* Bulk Transfer Location */}
@@ -1756,6 +1771,27 @@ export const App: React.FC = () => {
                                    />
                                    <span>Apply to Batch</span>
                                  </label>
+                                 <button
+                                   type="button"
+                                   onClick={() => setQrModalItems([item])}
+                                   className="p-1 h-6 w-6 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 flex items-center justify-center transition border border-slate-200 shrink-0"
+                                   title="Quick scan / View QR Code"
+                                 >
+                                   <QrIcon className="w-3.5 h-3.5" />
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleToggleItemLock(item)}
+                                   className={`px-1.5 h-6 rounded font-bold text-[10px] flex items-center gap-1 transition border shrink-0 ${
+                                     item.isLocked
+                                       ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                   }`}
+                                   title={item.isLocked ? 'Item locked for audit freeze. Click to unlock.' : 'Lock item for audit freeze'}
+                                 >
+                                   {item.isLocked ? <Lock className="w-3 h-3 text-amber-700 shrink-0" /> : <Unlock className="w-3 h-3 text-slate-500 shrink-0" />}
+                                   <span>{item.isLocked ? 'Locked' : 'Lock'}</span>
+                                 </button>
                                 <button
                                   onClick={() => handleAdjustStock(item.id, -1)}
                                   className="w-6 h-6 rounded bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-600 font-bold flex items-center justify-center transition"
