@@ -249,7 +249,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     supplier: "Knysna Linen Mills",
     lastRestocked: "2026-09-10",
     location: "Main Linen Storeroom Alpha",
-    priority: "High"
+    priority: "High",
+    notes: "Egyptian 600TC cotton. Stored in climate-controlled linen bay alpha.",
+    notas: "Algodón egipcio 600 hilos. Almacenado en bahía de lencería alfa."
   },
   {
     id: "inv-002",
@@ -264,7 +266,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     supplier: "Knysna Linen Mills",
     lastRestocked: "2026-09-12",
     location: "Housekeeping Utility Bay",
-    priority: "High"
+    priority: "High",
+    notes: "Embroidered suite towels. Inspected weekly for softness and freshness.",
+    notas: "Toallas bordadas de suite. Inspeccionadas semanalmente."
   },
   {
     id: "inv-003",
@@ -280,7 +284,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: "2026-08-28",
     expiryDate: "2026-10-15",
     location: "Suite 101-106 Amenities Pantry",
-    priority: "High"
+    priority: "High",
+    notes: "Fynbos botanical organic lot. Expiry Oct 2026 - priority rotation for suites 101-106.",
+    notas: "Lote orgánico de Fynbos. Vencimiento Oct 2026 - rotación prioritaria."
   },
   {
     id: "inv-004",
@@ -296,7 +302,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: "2026-09-15",
     expiryDate: "2026-12-31",
     location: "Main Bar Cellar",
-    priority: "Medium"
+    priority: "Medium",
+    notes: "Cap Classique cellar reserve. Store horizontal at 12°C. 12 bottles reserved for VIPs.",
+    notas: "Reserva de bodega Cap Classique. Conservar horizontal a 12°C."
   },
   {
     id: "inv-005",
@@ -312,7 +320,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     lastRestocked: "2026-09-18",
     expiryDate: "2026-10-20",
     location: "Kitchen Breakfast Pantry",
-    priority: "Medium"
+    priority: "Medium",
+    notes: "Organic honey & jam gift jars. Store away from direct sunlight. High turnover.",
+    notas: "Frascos de miel y mermelada orgánica. Mantener fuera de la luz directa."
   },
   {
     id: "inv-006",
@@ -327,7 +337,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     supplier: "Green Clean Garden Route",
     lastRestocked: "2026-09-02",
     location: "Basement Cleaning Station",
-    priority: "High"
+    priority: "High",
+    notes: "Marine eco sanitizer. Dilute 1:10 for daily housekeeping spray bottles.",
+    notas: "Desinfectante ecológico marino. Diluir 1:10 para botellas rociadoras."
   },
   {
     id: "inv-007",
@@ -342,7 +354,27 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     supplier: "Knysna Maritime Timber Supplies",
     lastRestocked: "2026-08-15",
     location: "Technical Maintenance Locker",
-    priority: "Low"
+    priority: "Low",
+    notes: "Marine teak sealant. Keep sealed tight in technical ventilation locker.",
+    notas: "Sellador de teca marina. Mantener sellado en casillero con ventilación."
+  },
+  {
+    id: "inv-008",
+    itemCode: "TOI-2002",
+    itemDescription: "Organic Rooibos & Honey Infusion Bath Salts (Trial Lot)",
+    category: "Toiletries & Amenities",
+    pricePerUnit: 165,
+    howManyUsed: 19,
+    whenToReorder: 10,
+    howManyOnHand: 6,
+    unit: "Pcs",
+    supplier: "Cape Botanical Essentials",
+    lastRestocked: "2026-07-20",
+    expiryDate: "2026-09-25",
+    location: "Spa & Wellness Pantry",
+    priority: "High",
+    notes: "Trial harvest batch. Expiry passed on Sep 25 - priority quarantine & disposal pending inspection.",
+    notas: "Lote de prueba de cosecha. Vencimiento superado el 25 de sep - cuarentena prioritaria pendiente de inspección."
   }
 ];
 

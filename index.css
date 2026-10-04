@@ -330,3 +330,34 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-o
 
 div#root:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(2) > div#brand-header-link:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
 }
+
+/* Expiry Date Filter Matching Animations */
+@keyframes expiryPulseGlowAmber {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.65), inset 0 0 0 1px rgba(245, 158, 11, 0.5);
+    background-color: rgba(254, 243, 199, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 14px 3px rgba(245, 158, 11, 0.4), inset 0 0 0 2px rgba(217, 119, 6, 0.9);
+    background-color: rgba(254, 243, 199, 0.85);
+  }
+}
+
+@keyframes expiryPulseGlowRose {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7), inset 0 0 0 1px rgba(225, 29, 72, 0.5);
+    background-color: rgba(255, 228, 230, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(225, 29, 72, 0.45), inset 0 0 0 2px rgba(190, 18, 60, 0.95);
+    background-color: rgba(255, 228, 230, 0.9);
+  }
+}
+
+.expiry-pulse-row-overdue {
+  animation: expiryPulseGlowRose 1.8s ease-in-out infinite;
+}
+
+.expiry-pulse-row-matching {
+  animation: expiryPulseGlowAmber 2s ease-in-out infinite;
+}

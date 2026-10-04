@@ -82,7 +82,9 @@ import {
   Star,
   MessageSquare,
   Lock,
-  Unlock
+  Unlock,
+  Calendar,
+  Edit3
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -246,7 +248,24 @@ export const App: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>(() => {
     try {
       const saved = localStorage.getItem(INVENTORY_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: InventoryItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map(i => i.id));
+          const missing = INITIAL_INVENTORY.filter(i => !existingIds.has(i.id));
+          // Also backfill notes/notas if present in INITIAL_INVENTORY
+          const enriched = parsed.map(item => {
+            const initial = INITIAL_INVENTORY.find(i => i.id === item.id);
+            return {
+              ...item,
+              notes: item.notes || initial?.notes,
+              notas: item.notas || initial?.notas,
+              expiryDate: item.expiryDate || initial?.expiryDate
+            };
+          });
+          return [...enriched, ...missing];
+        }
+      }
     } catch (e) {
       console.warn('Failed to load inventory', e);
     }
@@ -515,6 +534,75 @@ export const App: React.FC = () => {
   // Stock Audit Log State
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
   const [auditLogFilterItemId, setAuditLogFilterItemId] = useState<string | null>(null);
+
+  // Notes / Notas Field Modal State
+  const [notesModalItem, setNotesModalItem] = useState<InventoryItem | null>(null);
+  const [notesInputValue, setNotesInputValue] = useState('');
+  const [notasInputValue, setNotasInputValue] = useState('');
+
+  const handleOpenNotesModal = (item: InventoryItem) => {
+    setNotesModalItem(item);
+    setNotesInputValue(item.notes || '');
+    setNotasInputValue(item.notas || '');
+  };
+
+  const handleSaveNotes = () => {
+    if (!notesModalItem) return;
+    const updatedNotes = notesInputValue.trim();
+    const updatedNotas = notasInputValue.trim();
+
+    setInventory(prev => prev.map(i => {
+      if (i.id === notesModalItem.id) {
+        return {
+          ...i,
+          notes: updatedNotes,
+          notas: updatedNotas
+        };
+      }
+      return i;
+    }));
+
+    appendAuditLog({
+      itemId: notesModalItem.id,
+      itemCode: notesModalItem.itemCode,
+      itemDescription: notesModalItem.itemDescription,
+      previousQty: notesModalItem.howManyOnHand,
+      newQty: notesModalItem.howManyOnHand,
+      deltaQty: 0,
+      adjustedBy: 'Eleanor Sterling (Head of Ops)',
+      actionType: 'Notes/Notas Update',
+      notes: `Updated notes: "${updatedNotes || 'None'}" / notas: "${updatedNotas || 'None'}"`
+    });
+
+    setNotesModalItem(null);
+  };
+
+  // Dynamic counts for Expiry Date filters
+  const expiryFilterCounts = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let overdue = 0;
+    let days30 = 0;
+    let days60 = 0;
+    let days90 = 0;
+    let days120 = 0;
+    let totalWithExpiry = 0;
+
+    inventory.forEach(item => {
+      if (!item.expiryDate) return;
+      totalWithExpiry++;
+      const exp = new Date(item.expiryDate);
+      exp.setHours(0, 0, 0, 0);
+      const diff = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff < 0) overdue++;
+      if (diff >= 0 && diff <= 30) days30++;
+      if (diff >= 0 && diff <= 60) days60++;
+      if (diff >= 0 && diff <= 90) days90++;
+      if (diff >= 0 && diff <= 120) days120++;
+    });
+
+    return { overdue, days30, days60, days90, days120, totalWithExpiry };
+  }, [inventory]);
   const [stockAuditLogs, setStockAuditLogs] = useState<StockAuditLogEntry[]>(() => {
     try {
       const stored = localStorage.getItem(AUDIT_STORAGE_KEY);
@@ -587,10 +675,11 @@ export const App: React.FC = () => {
 
   // Export to CSV helper
   const handleExportInventoryCsv = () => {
-    const headers = ['Item Code', 'Description', 'Category', 'Unit Price (ZAR)', 'On Hand', 'Unit', 'Reorder Level', 'Stock Status', 'Predicted Order Date', 'Supplier', 'Last Restocked'];
+    const headers = ['Item Code', 'Description', 'Category', 'Unit Price (ZAR)', 'On Hand', 'Unit', 'Reorder Level', 'Stock Status', 'Expiry Date', 'Predicted Order Date', 'Supplier', 'Last Restocked', 'Notes / Notas'];
     const rows = filteredInventory.map(item => {
       const isLow = item.howManyOnHand <= item.whenToReorder;
       const orderAnalysis = calculateOrderDate(item);
+      const notesValue = [item.notes, item.notas ? `[ES: ${item.notas}]` : ''].filter(Boolean).join(' | ');
       return [
         `"${item.itemCode}"`,
         `"${item.itemDescription.replace(/"/g, '""')}"`,
@@ -600,9 +689,11 @@ export const App: React.FC = () => {
         `"${item.unit}"`,
         item.whenToReorder,
         `"${isLow ? 'REORDER NEEDED' : 'ADEQUATE'}"`,
+        `"${item.expiryDate || 'N/A'}"`,
         `"${orderAnalysis.suggestedOrderDateFormatted} (${orderAnalysis.urgencyLabel})"`,
         `"${item.supplier.replace(/"/g, '""')}"`,
-        `"${item.lastRestocked || ''}"`
+        `"${item.lastRestocked || ''}"`,
+        `"${notesValue.replace(/"/g, '""')}"`
       ].join(',');
     });
 
@@ -1339,7 +1430,12 @@ export const App: React.FC = () => {
                         howManyOnHand: 8, // Triggers alert for demonstration
                         unit: 'units',
                         supplier: 'Garden Route Hospitality Supplies',
-                        lastRestocked: new Date().toISOString().split('T')[0]
+                        lastRestocked: new Date().toISOString().split('T')[0],
+                        location: 'Main Storeroom Alpha',
+                        priority: 'Medium',
+                        expiryDate: '2026-11-20',
+                        notes: 'Newly added stock item. Inspect upon arrival.',
+                        notas: 'Artículo recién añadido. Inspeccionar al llegar.'
                       };
                       setInventory([newItem, ...inventory]);
                     }}
@@ -1470,30 +1566,83 @@ export const App: React.FC = () => {
 
                 {/* Expiry Date Filter Row */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pt-2 text-[11px] border-t border-slate-200/60 mt-2">
-                  <span className="text-amber-700 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
+                  <span className="text-amber-800 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
                     📅 Expiry Filter:
                   </span>
                   {[
-                    { label: 'All Expiries', value: 'All' },
-                    { label: '⚠️ Overdue', value: 'Overdue' },
-                    { label: 'Next 30 Days', value: '30Days' },
-                    { label: 'Next 60 Days', value: '60Days' },
-                    { label: 'Next 90 Days', value: '90Days' },
-                    { label: 'Next 120 Days', value: '120Days' }
+                    { label: 'All Expiries', value: 'All', count: inventory.length },
+                    { label: '⚠️ Overdue', value: 'Overdue', count: expiryFilterCounts.overdue, isOverdue: true },
+                    { label: 'Next 30 Days', value: '30Days', count: expiryFilterCounts.days30, isWarn: true },
+                    { label: 'Next 60 Days', value: '60Days', count: expiryFilterCounts.days60 },
+                    { label: 'Next 90 Days', value: '90Days', count: expiryFilterCounts.days90 },
+                    { label: 'Next 120 Days', value: '120Days', count: expiryFilterCounts.days120 }
                   ].map(exp => (
                     <button
                       key={exp.value}
                       onClick={() => setInventoryExpiryFilter(exp.value as any)}
-                      className={`px-2.5 py-1 rounded-md font-semibold transition shrink-0 ${
+                      className={`px-2.5 py-1 rounded-md font-semibold transition shrink-0 flex items-center gap-1.5 ${
                         inventoryExpiryFilter === exp.value
-                          ? 'bg-amber-600 text-white font-bold shadow-xs'
+                          ? exp.value === 'Overdue'
+                            ? 'bg-rose-600 text-white font-bold shadow-xs ring-2 ring-rose-400'
+                            : 'bg-amber-600 text-white font-bold shadow-xs ring-2 ring-amber-400'
                           : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                       }`}
+                      title={`Filter inventory by ${exp.label} (${exp.count} items match)`}
                     >
-                      {exp.label}
+                      <span>{exp.label}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                        inventoryExpiryFilter === exp.value
+                          ? 'bg-white/20 text-white'
+                          : exp.isOverdue && exp.count > 0
+                          ? 'bg-rose-100 text-rose-700 animate-pulse font-extrabold'
+                          : exp.isWarn && exp.count > 0
+                          ? 'bg-amber-100 text-amber-800 font-bold'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {exp.count}
+                      </span>
                     </button>
                   ))}
                 </div>
+
+                {/* Active Expiry Pulse Spotlight Notification */}
+                {inventoryExpiryFilter !== 'All' && (
+                  <div className={`mt-2.5 px-3.5 py-2 rounded-xl text-xs flex items-center justify-between border shadow-xs animate-fade-in ${
+                    inventoryExpiryFilter === 'Overdue'
+                      ? 'bg-rose-50 border-rose-200 text-rose-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-3 w-3 shrink-0">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                          inventoryExpiryFilter === 'Overdue' ? 'bg-rose-500' : 'bg-amber-500'
+                        }`}></span>
+                        <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                          inventoryExpiryFilter === 'Overdue' ? 'bg-rose-600' : 'bg-amber-600'
+                        }`}></span>
+                      </span>
+                      <div>
+                        <span className="font-bold">
+                          {inventoryExpiryFilter === 'Overdue' ? '🚨 Overdue Items Spotlight:' : '⏳ Expiry Date Spotlight:'}
+                        </span>{' '}
+                        <span>
+                          Pulsing visual effect active for <strong>{filteredInventory.length}</strong> item{filteredInventory.length === 1 ? '' : 's'} matching <strong>"{inventoryExpiryFilter}"</strong> criteria.
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInventoryExpiryFilter('All')}
+                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border transition shrink-0 ml-2 ${
+                        inventoryExpiryFilter === 'Overdue'
+                          ? 'bg-white text-rose-700 border-rose-300 hover:bg-rose-100'
+                          : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'
+                      }`}
+                    >
+                      Clear Expiry Filter
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Batch Action Success Notice */}
@@ -1682,6 +1831,7 @@ export const App: React.FC = () => {
                       <th className="px-3 py-2.5">Price / Unit</th>
                       <th className="px-3 py-2.5">On Hand</th>
                       <th className="px-3 py-2.5">Reorder Level</th>
+                      <th className="px-3 py-2.5 min-w-[210px]">Notes / Notas</th>
                       <th className="px-3 py-2.5">Adjust Stock</th>
                       <th className="px-3 py-2.5 text-center">Audit</th>
                       <th className="px-3 py-2.5 text-center">QR Tag</th>
@@ -1691,7 +1841,7 @@ export const App: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {filteredInventory.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-4 py-8 text-center text-slate-400 text-xs">
+                        <td colSpan={14} className="px-4 py-8 text-center text-slate-400 text-xs">
                           <Search className="w-6 h-6 mx-auto text-slate-300 mb-2" />
                           <p className="font-semibold text-slate-600">No inventory items matched your search criteria.</p>
                           <p className="text-[11px] text-slate-400 mt-0.5">Try searching for a different item description, code, or reset the filters.</p>
@@ -1700,6 +1850,7 @@ export const App: React.FC = () => {
                               setInventorySearchQuery('');
                               setInventoryCategoryFilter('All');
                               setInventoryStockStatusFilter('All');
+                              setInventoryExpiryFilter('All');
                             }}
                             className="mt-2.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs inline-flex items-center gap-1 transition"
                           >
@@ -1713,7 +1864,37 @@ export const App: React.FC = () => {
                         const isLow = item.howManyOnHand <= item.whenToReorder;
                         const isSelected = selectedItemIds.includes(item.id);
                         const priority = item.priority || 'Medium';
+
+                        // Evaluate item expiry against active filter
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        let itemDiffDays: number | null = null;
+                        let isItemOverdue = false;
+                        let matchesActiveExpiryFilter = false;
+
+                        if (item.expiryDate) {
+                          const expDate = new Date(item.expiryDate);
+                          expDate.setHours(0, 0, 0, 0);
+                          itemDiffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          isItemOverdue = itemDiffDays < 0;
+
+                          if (inventoryExpiryFilter !== 'All') {
+                            if (inventoryExpiryFilter === 'Overdue' && isItemOverdue) matchesActiveExpiryFilter = true;
+                            else if (inventoryExpiryFilter === '30Days' && itemDiffDays >= 0 && itemDiffDays <= 30) matchesActiveExpiryFilter = true;
+                            else if (inventoryExpiryFilter === '60Days' && itemDiffDays >= 0 && itemDiffDays <= 60) matchesActiveExpiryFilter = true;
+                            else if (inventoryExpiryFilter === '90Days' && itemDiffDays >= 0 && itemDiffDays <= 90) matchesActiveExpiryFilter = true;
+                            else if (inventoryExpiryFilter === '120Days' && itemDiffDays >= 0 && itemDiffDays <= 120) matchesActiveExpiryFilter = true;
+                          }
+                        }
+
+                        const pulsingClass = matchesActiveExpiryFilter
+                          ? (isItemOverdue
+                              ? 'expiry-pulse-row-overdue border-l-4 border-l-rose-600 ring-2 ring-inset ring-rose-400/80 shadow-md'
+                              : 'expiry-pulse-row-matching border-l-4 border-l-amber-500 ring-2 ring-inset ring-amber-400/80 shadow-md')
+                          : '';
+
                         const priorityBgClass = isSelected ? 'bg-emerald-50/85' :
+                                               matchesActiveExpiryFilter ? (isItemOverdue ? 'bg-rose-50/70 hover:bg-rose-50' : 'bg-amber-50/60 hover:bg-amber-50') :
                                                item.isLocked ? 'bg-amber-100/90 hover:bg-amber-100 border-l-4 border-l-amber-600 shadow-2xs' :
                                                priority === 'High' ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-500' :
                                                priority === 'Medium' ? 'bg-amber-50/30 hover:bg-amber-50/50 border-l-4 border-l-amber-400' :
@@ -1722,7 +1903,7 @@ export const App: React.FC = () => {
                         return (
                           <tr 
                             key={item.id} 
-                            className={`transition ${priorityBgClass} ${isRowHeightened ? 'h-16' : ''}`}
+                            className={`transition-all duration-300 ${pulsingClass || priorityBgClass} ${isRowHeightened ? 'h-16' : ''}`}
                           >
                             <td className="px-3 py-2 text-center">
                               <input
@@ -1732,7 +1913,21 @@ export const App: React.FC = () => {
                                 className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                               />
                             </td>
-                            <td className="px-3 py-2 font-mono font-bold text-slate-700">{item.itemCode}</td>
+                            <td className="px-3 py-2 font-mono font-bold text-slate-700">
+                              <div className="flex items-center gap-1.5">
+                                {matchesActiveExpiryFilter && (
+                                  <span className="relative flex h-2.5 w-2.5 shrink-0" title={`Matches "${inventoryExpiryFilter}" expiry criteria (${itemDiffDays !== null ? (itemDiffDays < 0 ? `${Math.abs(itemDiffDays)}d overdue` : `${itemDiffDays}d remaining`) : ''})`}>
+                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                      isItemOverdue ? 'bg-rose-500' : 'bg-amber-500'
+                                    }`}></span>
+                                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                                      isItemOverdue ? 'bg-rose-600' : 'bg-amber-600'
+                                    }`}></span>
+                                  </span>
+                                )}
+                                <span>{item.itemCode}</span>
+                              </div>
+                            </td>
                             <td className="px-3 py-2 font-semibold text-slate-900">{item.itemDescription}</td>
                             <td className="px-3 py-2">
                               <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 whitespace-nowrap">
@@ -1760,6 +1955,53 @@ export const App: React.FC = () => {
                             <td className="px-3 py-2 font-bold text-slate-800">R {item.pricePerUnit}</td>
                             <td className="px-3 py-2 font-bold text-slate-900">{item.howManyOnHand} {item.unit}</td>
                             <td className="px-3 py-2 text-slate-500">{item.whenToReorder} {item.unit}</td>
+
+                            {/* Notes / Notas Field Cell */}
+                            <td className="px-3 py-2">
+                              <div className="flex flex-col gap-1 max-w-[240px]">
+                                {item.notes ? (
+                                  <div 
+                                    onClick={() => handleOpenNotesModal(item)}
+                                    className="cursor-pointer group flex items-start gap-1.5 text-[11px] text-slate-700 bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/90 px-2.5 py-1.5 rounded-lg transition shadow-2xs"
+                                    title="Click to view/edit English notes"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                                    <span className="line-clamp-2 font-medium leading-tight">{item.notes}</span>
+                                  </div>
+                                ) : null}
+                                {item.notas ? (
+                                  <div 
+                                    onClick={() => handleOpenNotesModal(item)}
+                                    className="cursor-pointer group flex items-start gap-1.5 text-[10.5px] text-slate-600 bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition"
+                                    title="Click to view/edit Spanish notas"
+                                  >
+                                    <span className="px-1 py-0.2 rounded text-[8.5px] font-bold bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">ES</span>
+                                    <span className="line-clamp-1 italic text-slate-500 font-serif leading-tight">{item.notas}</span>
+                                  </div>
+                                ) : null}
+                                {!item.notes && !item.notas ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenNotesModal(item)}
+                                    className="px-2 py-1 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 text-[10px] font-medium flex items-center gap-1 transition w-max"
+                                    title="Add notes/notas for this item"
+                                  >
+                                    <Plus className="w-3 h-3 text-slate-400" />
+                                    <span>Add Note / Nota</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenNotesModal(item)}
+                                    className="text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline flex items-center gap-1 self-start mt-0.5 transition"
+                                  >
+                                    <Edit3 className="w-2.5 h-2.5" />
+                                    <span>Edit Notes / Notas</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+
                             <td className="px-3 py-2">
                               <div className="inventory-table-row-actions flex items-center gap-1.5 flex-wrap">
                                  <label className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 px-2 py-1 rounded border border-emerald-200 cursor-pointer text-[10px] font-bold transition mr-1" title="Select item for concurrent batch operations">
@@ -1791,6 +2033,20 @@ export const App: React.FC = () => {
                                  >
                                    {item.isLocked ? <Lock className="w-3 h-3 text-amber-700 shrink-0" /> : <Unlock className="w-3 h-3 text-slate-500 shrink-0" />}
                                    <span>{item.isLocked ? 'Locked' : 'Lock'}</span>
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleOpenNotesModal(item)}
+                                   className={`px-2 h-6 rounded font-bold text-[10px] flex items-center gap-1 transition border shrink-0 ${
+                                     item.notes || item.notas
+                                       ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                                       : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                   }`}
+                                   title="View & Edit Notes / Notas for this stock item"
+                                 >
+                                   <FileText className="w-3 h-3 text-amber-600 shrink-0" />
+                                   <span>Notes</span>
+                                   {(item.notes || item.notas) && <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>}
                                  </button>
                                 <button
                                   onClick={() => handleAdjustStock(item.id, -1)}
@@ -1872,20 +2128,33 @@ export const App: React.FC = () => {
                                     ↩️ Undo
                                   </button>
                                 )}
-                                {item.expiryDate && (() => {
-                                  const today = new Date();
-                                  const exp = new Date(item.expiryDate);
-                                  const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                                  const isExpiringSoon = diffDays <= 30;
+                                {item.expiryDate && itemDiffDays !== null && (() => {
+                                  const isExpiringSoon = itemDiffDays <= 30;
                                   return (
                                     <span 
-                                      className={`px-2 h-6 rounded text-[10px] font-bold flex items-center gap-1 border ${
-                                        isExpiringSoon ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                      className={`px-2.5 h-6 rounded text-[10px] font-bold flex items-center gap-1 border transition-all ${
+                                        matchesActiveExpiryFilter
+                                          ? isItemOverdue
+                                            ? 'bg-rose-100 text-rose-900 border-rose-400 ring-2 ring-rose-400 animate-pulse font-extrabold shadow-sm'
+                                            : 'bg-amber-100 text-amber-900 border-amber-400 ring-2 ring-amber-400 animate-pulse font-extrabold shadow-sm'
+                                          : isItemOverdue
+                                          ? 'bg-rose-100 text-rose-900 border-rose-300 animate-pulse font-bold'
+                                          : isExpiringSoon
+                                          ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse'
+                                          : 'bg-slate-100 text-slate-700 border-slate-200'
                                       }`}
-                                      title={`Expiry Date: ${item.expiryDate} (${diffDays} days remaining)`}
+                                      title={`Expiry Date: ${item.expiryDate} (${itemDiffDays < 0 ? `${Math.abs(itemDiffDays)} days overdue` : `${itemDiffDays} days remaining`})`}
                                     >
-                                      {isExpiringSoon && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
-                                      📅 Expiry: {item.expiryDate}
+                                      {isItemOverdue ? (
+                                        <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0 animate-bounce" />
+                                      ) : isExpiringSoon ? (
+                                        <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                      ) : (
+                                        <Calendar className="w-3 h-3 text-slate-500 shrink-0" />
+                                      )}
+                                      <span>
+                                        {isItemOverdue ? `⚠️ Exp: ${item.expiryDate} (${Math.abs(itemDiffDays)}d overdue)` : `📅 Exp: ${item.expiryDate} (${itemDiffDays}d)`}
+                                      </span>
                                     </span>
                                   );
                                 })()}
@@ -2742,6 +3011,141 @@ export const App: React.FC = () => {
                       className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition shadow-md"
                     >
                       Confirm Transfer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* NOTES / NOTAS FIELD MODAL */}
+            {notesModalItem && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif-luxury font-bold text-slate-900 text-base">
+                          Item Notes & Notas Management
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          {notesModalItem.itemCode} &bull; {notesModalItem.itemDescription}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setNotesModalItem(null)} 
+                      className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Item Metadata Quick Pill */}
+                  <div className="flex flex-wrap gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span className="font-semibold text-slate-700">Category: <strong className="text-slate-900">{notesModalItem.category}</strong></span>
+                    <span className="text-slate-300">&bull;</span>
+                    <span className="font-semibold text-slate-700">Supplier: <strong className="text-slate-900">{notesModalItem.supplier}</strong></span>
+                    <span className="text-slate-300">&bull;</span>
+                    <span className="font-semibold text-slate-700">Location: <strong className="text-slate-900">{notesModalItem.location || 'Main Store'}</strong></span>
+                    {notesModalItem.expiryDate && (
+                      <>
+                        <span className="text-slate-300">&bull;</span>
+                        <span className="font-semibold text-amber-700">Expiry: <strong className="text-amber-900">{notesModalItem.expiryDate}</strong></span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Form fields for English Notes and Spanish Notas */}
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                          🇬🇧 Operational Notes (English)
+                        </label>
+                        <span className="text-[10px] text-slate-400">{notesInputValue.length} chars</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={notesInputValue}
+                        onChange={(e) => setNotesInputValue(e.target.value)}
+                        placeholder="Enter storage instructions, usage guidelines, suite rotation notes..."
+                        className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none leading-relaxed text-slate-800"
+                      />
+                      
+                      {/* Preset snippets for quick entry */}
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        <span className="text-[10px] text-slate-400 font-semibold mr-1 flex items-center">Presets:</span>
+                        {[
+                          'VIP suite priority rotation',
+                          'Store in climate-controlled bay',
+                          'Check expiry weekly',
+                          'High seasonal turnover',
+                          'Awaiting supplier batch'
+                        ].map(preset => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => {
+                              const separator = notesInputValue.trim() ? '. ' : '';
+                              setNotesInputValue(prev => `${prev.trim()}${separator}${preset}.`);
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-600 text-[10px] font-medium transition border border-slate-200"
+                          >
+                            + {preset}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                          🇪🇸 Notas Operativas (Español)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (notesInputValue && !notasInputValue) {
+                              setNotasInputValue(notesInputValue);
+                            }
+                          }}
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                          title="Copy English notes into Spanish field"
+                        >
+                          <span>Copy from Notes</span>
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={notasInputValue}
+                        onChange={(e) => setNotasInputValue(e.target.value)}
+                        placeholder="ej. Instrucciones de almacenamiento, rotación prioritaria, observaciones..."
+                        className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none leading-relaxed text-slate-800 italic font-serif"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-[11px] text-slate-500 flex items-center gap-2">
+                    <History className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span>Saving will automatically record an immutable audit entry in the <strong>Stock Audit Trail</strong>.</span>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                    <button
+                      onClick={() => setNotesModalItem(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveNotes}
+                      className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Save Notes & Notas
                     </button>
                   </div>
                 </div>

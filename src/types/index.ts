@@ -114,6 +114,8 @@ export interface InventoryItem {
   predictedOrderDate?: string;
   consumptionHistory?: number[];
   isLocked?: boolean;
+  notes?: string;
+  notas?: string;
 }
 
 export interface StockAuditLogEntry {
