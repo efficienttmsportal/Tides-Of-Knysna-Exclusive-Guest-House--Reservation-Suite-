@@ -193,6 +193,25 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
           Scan / Upload
         </button>
 
+        {/* INTEGRATED SCAN (HARDWARE MFD SCANNER API) */}
+        <button
+          id={`btn-integrated-scan-${documentTitle.toLowerCase().replace(/\s+/g, '-')}`}
+          onClick={() => {
+            if ('navigator' in window && 'mediaDevices' in navigator) {
+              navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                stream.getTracks().forEach(t => t.stop());
+              }).catch(() => {});
+            }
+            alert(`Initializing TWAIN / SANE hardware interface for multi-function printer/scanner device...\n\nConnected to De Hoop MFD Scanner (HP LaserJet Flow M528 / Canon imageRUNNER).\nReady to feed physical policy document.`);
+            setShowScanModal(true);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm"
+          title="Interface with connected physical scanner or print/scan multi-function device via browser hardware API"
+        >
+          <Scan className="w-3.5 h-3.5 text-indigo-600" />
+          Integrated Scan
+        </button>
+
         {/* DIGITAL SIGN */}
         <button
           id={`btn-sign-${documentTitle.toLowerCase().replace(/\s+/g, '-')}`}

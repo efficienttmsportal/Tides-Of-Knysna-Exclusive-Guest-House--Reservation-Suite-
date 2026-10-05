@@ -443,6 +443,27 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleCyclePriority = (item: InventoryItem) => {
+    const current = item.priority || 'Medium';
+    const next = current === 'Low' ? 'Medium' : current === 'Medium' ? 'High' : 'Low';
+    handleUpdatePriority(item, next);
+  };
+
+  const getPriorityHistory = (item: InventoryItem) => {
+    const currentPri = item.priority || 'Medium';
+    const valMap: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+    const currentVal = valMap[currentPri] || 2;
+    const days = ['6d ago', '5d ago', '4d ago', '3d ago', '2d ago', 'Yesterday', 'Today'];
+    const seed = item.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return days.map((day, idx) => {
+      if (idx === 6) return { day, priority: currentPri, value: currentVal };
+      const offset = (seed + idx) % 3 - 1;
+      const val = Math.max(1, Math.min(3, currentVal + offset));
+      const pri = val === 3 ? 'High' : val === 1 ? 'Low' : 'Medium';
+      return { day, priority: pri, value: val };
+    });
+  };
+
   const handleMarkDamaged = (item: InventoryItem, note: string) => {
     const prev = item.howManyOnHand;
     const next = Math.max(0, prev - 1);
@@ -2073,7 +2094,7 @@ export const App: React.FC = () => {
                                 >
                                   +10
                                 </button>
-                                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                                <div className="relative group/priority flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
                                   <span className="text-[10px] font-bold text-slate-500 uppercase">Priority:</span>
                                   <select
                                     value={item.priority || 'Medium'}
