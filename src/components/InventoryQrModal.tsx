@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem, SupplierContact } from '../types';
 import { INITIAL_SUPPLIERS } from '../data/initialData';
+import { WhatsAppIcon } from './GuestPortal';
 
 export type InventoryQrPayloadType = 'quick_scan' | 'json' | 'web_portal';
 
@@ -205,6 +206,22 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
   // Print Action
   const handlePrint = () => {
     window.print();
+  };
+
+  // Share via WhatsApp
+  const handleWhatsAppShare = () => {
+    if (!activeItem) return;
+    const portalUrl = `https://tidesofknysna.co.za/portal/inventory?code=${encodeURIComponent(activeItem.itemCode)}`;
+    const statusText = activeItem.howManyOnHand <= activeItem.whenToReorder ? '⚠️ REORDER NEEDED' : '✅ ADEQUATE';
+    const text = 
+      `📦 *TIDES OF KNYSNA - INVENTORY ASSET PORTAL*\n` +
+      `🏷️ *Item Code:* ${activeItem.itemCode}\n` +
+      `📝 *Description:* ${activeItem.itemDescription} (${activeItem.category})\n` +
+      `📊 *On Hand:* ${activeItem.howManyOnHand} ${activeItem.unit} (Reorder threshold: ${activeItem.whenToReorder} ${activeItem.unit})\n` +
+      `📌 *Status:* ${statusText}\n` +
+      `🏢 *Supplier:* ${activeItem.supplier}\n` +
+      `🌐 *Web Portal Link:* ${portalUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
   if (!activeItem) return null;
@@ -470,6 +487,14 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
                         Copy Payload
                       </>
                     )}
+                  </button>
+                  <button
+                    onClick={handleWhatsAppShare}
+                    className="py-2 px-3 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
+                    title="Share item details & web portal link via WhatsApp"
+                  >
+                    <WhatsAppIcon className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
                   </button>
                 </div>
               </div>

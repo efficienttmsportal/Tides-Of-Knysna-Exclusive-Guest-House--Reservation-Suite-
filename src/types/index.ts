@@ -273,6 +273,9 @@ export interface AttractionItem {
   distanceFromGuestHouse: string;
   highlights: string[];
   isEmergency?: boolean;
+  openingTime?: string;
+  closingTime?: string;
+  recommendedDuration?: string;
 }
 
 export interface MarketingTemplate {

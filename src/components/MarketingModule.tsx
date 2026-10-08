@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import jsPDF from 'jspdf';
 import { 
   Megaphone, 
   Hash, 
@@ -333,6 +334,100 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
     }
   }, [selectedSpecialId]);
 
+  // Download Special or Marketing Material as Official Adobe PDF with Corporate Branding
+  const handleDownloadMarketingAdobePdf = (title: string, subtitle: string, details: string) => {
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const companyTitle = resolvedCompany.name;
+      const companySub = resolvedCompany.tagline || '5-STAR LUXURY BOUTIQUE RETREAT & SPA';
+      const companyAddr = resolvedCompany.address || GUEST_HOUSE_INFO.address;
+      const companyTel = resolvedCompany.telephone || GUEST_HOUSE_INFO.telephone;
+      const companyEmail = resolvedCompany.email || GUEST_HOUSE_INFO.email;
+
+      // Header background
+      pdf.setFillColor(6, 78, 59); // deep emerald
+      pdf.rect(0, 0, 210, 32, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(16);
+      pdf.text(companyTitle.toUpperCase(), 15, 12);
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(217, 119, 6); // gold
+      pdf.text(companySub, 15, 19);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(200, 200, 200);
+      pdf.text(`${companyAddr} | Tel: ${companyTel} | ${companyEmail} | VAT: 4890281928`, 15, 26);
+
+      // Title Banner
+      pdf.setFillColor(240, 253, 244);
+      pdf.setDrawColor(16, 185, 129);
+      pdf.rect(15, 38, 180, 18, 'FD');
+      pdf.setTextColor(6, 78, 59);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text(`OFFICIAL SPECIAL & MARKETING CAMPAIGN: ${title.toUpperCase()}`, 20, 49);
+
+      // Details block
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(15, 23, 42);
+
+      let yPos = 65;
+      pdf.text(`Category & Code: ${subtitle}`, 15, yPos);
+      yPos += 8;
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(15, yPos, 195, yPos);
+
+      yPos += 8;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(51, 65, 85);
+
+      const splitText = pdf.splitTextToSize(details, 180);
+      let lineIdx = 0;
+      while (lineIdx < splitText.length) {
+        if (yPos > 275) {
+          pdf.addPage();
+          yPos = 20;
+        }
+        pdf.text(splitText[lineIdx], 15, yPos);
+        yPos += 6;
+        lineIdx++;
+      }
+
+      if (yPos > 265) {
+        pdf.addPage();
+        yPos = 20;
+      }
+      yPos += 12;
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(15, yPos, 195, yPos);
+      yPos += 6;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(6, 78, 59);
+      pdf.text('TIDES OF KNYSNA • 5-STAR LUXURY ESTATE & GUEST SANCTUARY', 15, yPos);
+      yPos += 4;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Tourism Grading Council of South Africa (TGCSA) Graded ★★★★★ • VAT Reg: 4890281928', 15, yPos);
+      yPos += 3.5;
+      pdf.text(`Reservations & Marketing: ${companyTel} • ${companyEmail}`, 15, yPos);
+
+      pdf.save(`${title.replace(/[^a-zA-Z0-9]/g, '_')}_Adobe_PDF.pdf`);
+      setSaveSuccessMsg(`Downloaded ${title} as Adobe PDF successfully!`);
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } catch (err) {
+      console.error('Marketing PDF generation error:', err);
+      setSaveSuccessMsg('Failed to generate Adobe PDF.');
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    }
+  };
+
   // Handle uploading image for a special (base64)
   const handleUploadSpecialImage = (file: File) => {
     const reader = new FileReader();
@@ -550,6 +645,335 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
     setTimeout(() => setCopiedSignature(false), 2500);
   };
 
+  // ==========================================
+  // MARKETING DOWNLOAD & SHARING HANDLERS
+  // ==========================================
+  const handleDownloadHtmlDoc = (filename: string, title: string, contentHtml: string) => {
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${title} - ${resolvedCompany.name}</title>
+  <style>
+    @page { size: A4 portrait; margin: 15mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; background: #fff; line-height: 1.5; }
+    .header { border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .footer { margin-top: 36px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; text-align: center; }
+    @media print { body { padding: 0; } .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h2 style="margin: 0; color: #064e3b; font-family: Georgia, serif;">${resolvedCompany.name}</h2>
+      <div style="font-size: 12px; color: #64748b; font-style: italic;">${resolvedCompany.tagline}</div>
+    </div>
+    <div style="text-align: right; font-size: 11px; color: #475569;">
+      <div>TGCSA ★★★★★ Luxury Graded</div>
+      <div>Knysna Lagoon • Garden Route</div>
+    </div>
+  </div>
+  ${contentHtml}
+  <div class="footer">
+    <div>Issued by ${resolvedCompany.name} Marketing Division • VAT: 4890281928</div>
+    <div>Enquiries: ${resolvedCompany.email} • Tel: ${resolvedCompany.telephone} • Web: ${resolvedCompany.webAddress}</div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename.replace(/\s+/g, '_')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSaveSuccessMsg(`Downloaded "${title}" dossier successfully!`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const getSpecialShareText = (sp: MarketingSpecial) => {
+    return `Dear Valued Guest,\n\n` +
+      `We are delighted to share an exclusive privilege invitation to ${resolvedCompany.name} in Knysna.\n\n` +
+      `✨ ${sp.title.toUpperCase()}\n` +
+      `${sp.description}\n\n` +
+      `🎁 PRIVILEGE BENEFIT: ${sp.discountPercent}% Direct Booking Saving\n` +
+      `🔑 EXCLUSIVE PROMO CODE: ${sp.promoCode}\n` +
+      `📅 VALIDITY: Valid until ${sp.validUntil}\n` +
+      (sp.inclusions && sp.inclusions.length > 0 ? `\nPackage Inclusions:\n` + sp.inclusions.map(i => `• ${i}`).join('\n') + `\n` : '') +
+      `\nReserve your suite directly online: https://${resolvedCompany.webAddress}\n` +
+      `Direct Inquiries: ${resolvedCompany.email} | Tel: ${resolvedCompany.telephone}\n\n` +
+      `Warm regards,\n${resolvedCompany.salesPerson}\n${resolvedCompany.name} Exclusive Guest House\n\n` +
+      (sp.hashtags || []).join(' ');
+  };
+
+  const handleShareSpecialEmail = (sp: MarketingSpecial, client: 'gmail' | 'yahoo' | 'outlook' | 'default') => {
+    const subject = encodeURIComponent(`Exclusive Invitation: ${sp.title} (${sp.discountPercent}% Saving) - ${resolvedCompany.name}`);
+    const body = encodeURIComponent(getSpecialShareText(sp));
+
+    if (client === 'gmail') {
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'yahoo') {
+      window.open(`https://compose.mail.yahoo.com/?subj=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'outlook') {
+      window.open(`https://outlook.live.com/mail/0/deeplink/compose?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+  };
+
+  const handleShareSpecialWhatsApp = (sp: MarketingSpecial) => {
+    const text = encodeURIComponent(getSpecialShareText(sp));
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadSpecialVoucher = (sp: MarketingSpecial) => {
+    const voucherHtml = `
+      <div style="border: 2px solid #064e3b; border-radius: 12px; padding: 24px; background: #f0fdf4; margin: 20px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <span style="background: #047857; color: #fff; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+              ${sp.season || 'Seasonal'} Exclusive Privilege Voucher
+            </span>
+            <h1 style="margin: 12px 0 6px 0; color: #0f172a; font-size: 24px; font-family: Georgia, serif;">${sp.title}</h1>
+            <p style="color: #334155; font-size: 14px; margin: 0 0 16px 0;">${sp.description}</p>
+          </div>
+          <div style="text-align: right; background: #fbbf24; color: #0f172a; padding: 12px 18px; border-radius: 12px; font-weight: 900; font-size: 18px;">
+            ${sp.discountPercent}% OFF
+          </div>
+        </div>
+
+        ${sp.inclusions && sp.inclusions.length > 0 ? `
+          <div style="margin: 16px 0; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid #a7f3d0;">
+            <strong style="font-size: 12px; color: #065f46; text-transform: uppercase;">Package Inclusions:</strong>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px; color: #1e293b;">
+              ${sp.inclusions.map(inc => `<li>${inc}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed #059669; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+          <div>
+            <span>PROMO CODE: </span><strong style="font-family: monospace; font-size: 16px; color: #065f46; background: #fff; padding: 3px 8px; border-radius: 6px; border: 1px solid #10b981;">${sp.promoCode}</strong>
+            <span style="color: #64748b; margin-left: 12px;">Valid until: ${sp.validUntil}</span>
+          </div>
+          <div style="font-weight: bold; color: #047857;">
+            Book Direct: ${resolvedCompany.webAddress}
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 11px; color: #64748b; font-family: monospace;">
+        Hashtags: ${(sp.hashtags || []).join(' ')}
+      </div>
+    `;
+
+    handleDownloadHtmlDoc(
+      `Special_Voucher_${sp.promoCode}`,
+      `Privilege Voucher - ${sp.title}`,
+      voucherHtml
+    );
+  };
+
+  const handleDownloadAllSpecialsCatalog = () => {
+    const catalogHtml = `
+      <h2 style="color: #065f46; font-family: Georgia, serif;">2026 Season Guest Specials & Promotional Packages</h2>
+      <p style="color: #64748b; font-size: 13px;">Official publication of direct booking privileges, seasonal discounts, and promotional vouchers.</p>
+      <div style="margin-top: 24px;">
+        ${specials.map(sp => `
+          <div style="border: 1px solid #cbd5e1; border-radius: 10px; padding: 18px; margin-bottom: 16px; background: #fff;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: 16px; color: #0f172a;">${sp.title}</strong>
+              <span style="background: #047857; color: #fff; padding: 3px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">${sp.discountPercent}% OFF</span>
+            </div>
+            <p style="font-size: 13px; color: #475569; margin: 8px 0;">${sp.description}</p>
+            <div style="font-size: 12px; color: #065f46;">
+              <strong>Promo Code:</strong> ${sp.promoCode} • <strong>Season:</strong> ${sp.season || 'All'} • <strong>Valid until:</strong> ${sp.validUntil}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    handleDownloadHtmlDoc(
+      `Tides_of_Knysna_Marketing_Specials_Catalog_2026`,
+      `Official Specials Catalog`,
+      catalogHtml
+    );
+  };
+
+  const handleDownloadLetterhead = () => {
+    const letterheadHtml = `
+      <div style="border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 22px; font-weight: bold; color: #064e3b; font-family: Georgia, serif;">${resolvedCompany.name}</div>
+          <div style="font-size: 12px; color: #047857; font-style: italic;">"${resolvedCompany.tagline}"</div>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <div style="font-weight: bold; color: #0f172a;">EST. 2024 • KNYSNA LAGOON</div>
+          <div>VAT REG: 4890281928</div>
+          <div>TGCSA 5-STAR EXCLUSIVE GRADED</div>
+        </div>
+      </div>
+      <div style="font-size: 13px; color: #334155; line-height: 1.8; min-height: 380px;">
+        <div style="color: #64748b; font-size: 12px; margin-bottom: 16px;">Date: ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        <p>Dear Valued Guest & Partner,</p>
+        <p>We have the distinct honor of welcoming you to ${resolvedCompany.name}. Nestled along the tranquil waters of the world-famous Knysna Lagoon, our sanctuary is committed to delivering unmatched privacy, gourmet gastronomy, and bespoke adventures across the Garden Route.</p>
+        <p>Should you require private yacht charters, helicopter transfers, or curated dining on our lagoon deck, our concierge remains at your dedicated service.</p>
+        <div style="margin-top: 36px;">
+          <div style="font-weight: bold; color: #0f172a;">${resolvedCompany.salesPerson}</div>
+          <div style="color: #64748b; font-size: 12px;">Head of Guest Experience & Reservations</div>
+        </div>
+      </div>
+      <div style="border-top: 1px solid #cbd5e1; padding-top: 12px; font-size: 11px; color: #64748b; text-align: center;">
+        <div>${resolvedCompany.address}</div>
+        <div>Tel: ${resolvedCompany.contactNumbers} | Email: ${resolvedCompany.email} | Web: ${resolvedCompany.webAddress}</div>
+      </div>
+    `;
+
+    handleDownloadHtmlDoc(
+      `Tides_of_Knysna_Official_Letterhead`,
+      `Official Corporate Letterhead`,
+      letterheadHtml
+    );
+  };
+
+  const handleDownloadEmailSignatureHtml = () => {
+    const sigHtml = `<!DOCTYPE html><html><body>
+<table style="font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; max-width: 600px; border-collapse: collapse;">
+  <tr><td style="padding-bottom: 12px;"><strong style="font-size: 16px; color: #065f46;">${resolvedCompany.salesPerson}</strong><br/><span style="color: #64748b; font-size: 12px;">Head of Guest Experience & Reservations | ${resolvedCompany.name}</span></td></tr>
+  <tr><td style="padding-bottom: 12px;"><a href="https://${resolvedCompany.webAddress}" target="_blank"><img src="${resolvedCompany.logoUrl || GUEST_HOUSE_INFO.logoUrl}" alt="${resolvedCompany.name}" style="height: 50px; display: block; border-radius: 6px; border: 0;" /></a></td></tr>
+  <tr><td style="padding-bottom: 10px; font-size: 12px; line-height: 1.5; color: #334155; border-top: 1px solid #e2e8f0; padding-top: 10px;">📍 <strong>Address:</strong> ${resolvedCompany.address}<br/>📞 <strong>Tel:</strong> ${resolvedCompany.telephone} | <strong>Mobile:</strong> ${resolvedCompany.mobile}<br/>✉️ <strong>Direct:</strong> <a href="mailto:${resolvedCompany.email}" style="color: #059669; text-decoration: none;">${resolvedCompany.email}</a> | 🌐 <a href="https://${resolvedCompany.webAddress}" style="color: #059669; text-decoration: none;">${resolvedCompany.webAddress}</a></td></tr>
+  <tr><td style="padding-top: 8px;"><img src="${resolvedCompany.emailSignatureBannerUrl || resolvedCompany.brandingImageUrl || GUEST_HOUSE_INFO.brandingImageUrl}" alt="5-Star Accreditation & Specials" style="max-width: 100%; border-radius: 6px; display: block; border: 0;" /></td></tr>
+  <tr><td style="padding-top: 8px; font-size: 10px; color: #94a3b8; font-style: italic;">${resolvedCompany.tagline} • South Africa 5-Star Graded Tourism Establishment</td></tr>
+</table>
+</body></html>`;
+
+    const blob = new Blob([sigHtml], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tides_Knysna_Email_Signature.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSaveSuccessMsg('Downloaded Email Signature HTML file!');
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleDownloadSocialPost = (platformName: string, title: string, textContent: string) => {
+    const postHtml = `
+      <div style="border: 1px solid #cbd5e1; border-radius: 12px; padding: 24px; background: #f8fafc; margin: 20px 0;">
+        <span style="background: #0f172a; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+          ${platformName} Social Asset
+        </span>
+        <h2 style="margin: 14px 0 8px 0; color: #0f172a;">${title}</h2>
+        <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #334155; background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          ${textContent}
+        </div>
+      </div>
+    `;
+
+    handleDownloadHtmlDoc(
+      `Social_${platformName.replace(/\s+/g, '_')}_Post`,
+      `${platformName} Campaign Asset`,
+      postHtml
+    );
+  };
+
+  const handleShareSocialWhatsApp = (platformName: string, content: string) => {
+    const text = encodeURIComponent(`🌊 *${resolvedCompany.name} - ${platformName} Post Asset*\n\n${content}`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareSocialEmail = (platformName: string, content: string, client: 'gmail' | 'yahoo' | 'outlook' | 'default') => {
+    const subject = encodeURIComponent(`${resolvedCompany.name} - ${platformName} Marketing Asset`);
+    const body = encodeURIComponent(content);
+
+    if (client === 'gmail') {
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'yahoo') {
+      window.open(`https://compose.mail.yahoo.com/?subj=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'outlook') {
+      window.open(`https://outlook.live.com/mail/0/deeplink/compose?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+  };
+
+  const handleDownloadHashtags = () => {
+    const txtContent = `${resolvedCompany.name} Official Tourism & Marketing Hashtags Directory\nUpdated: ${new Date().toISOString().slice(0, 10)}\n\n` +
+      `ALL ACTIVE HASHTAGS:\n${hashtagsList.join('\n')}\n\n` +
+      `COPY-PASTE STRING:\n${hashtagsList.join(' ')}\n`;
+
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tides_of_Knysna_Hashtags_Directory.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSaveSuccessMsg('Downloaded Hashtags Directory text file!');
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleShareHashtagsWhatsApp = () => {
+    const text = encodeURIComponent(`🌊 *${resolvedCompany.name} Official Hashtags*\n\n${hashtagsList.join(' ')}`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadSalesReportCsv = () => {
+    const csvContent = "Month,Room Nights Sold,Occupancy Rate,ADR (ZAR),Gross Revenue (ZAR)\n" +
+      "January 2026,168 Nights,90.3%,2850,478800\n" +
+      "February 2026,152 Nights,89.4%,2800,425600\n" +
+      "March 2026,145 Nights,78.0%,2750,398750\n" +
+      "June 2026 (Oyster Fest),175 Nights,97.2%,3200,560000\n" +
+      "September 2026 (Current),158 Nights,87.7%,2900,458200\n";
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tides_of_Knysna_Sales_Report_2026.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSaveSuccessMsg('Downloaded Monthly Sales Report CSV!');
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleShareSalesReportEmail = (client: 'gmail' | 'yahoo' | 'outlook' | 'default') => {
+    const subject = encodeURIComponent(`${resolvedCompany.name} - Monthly Tourism & Sales Performance Report`);
+    const body = encodeURIComponent(
+      `Executive Sales & Tourism Performance Summary - ${resolvedCompany.name}\n\n` +
+      `• Jan 2026: 168 Nights (90.3% Occ) | ADR R2,850 | Gross R 478,800\n` +
+      `• Feb 2026: 152 Nights (89.4% Occ) | ADR R2,800 | Gross R 425,600\n` +
+      `• Mar 2026: 145 Nights (78.0% Occ) | ADR R2,750 | Gross R 398,750\n` +
+      `• Jun 2026: 175 Nights (97.2% Occ) | ADR R3,200 | Gross R 560,000 (Oyster Festival)\n` +
+      `• Sep 2026: 158 Nights (87.7% Occ) | ADR R2,900 | Gross R 458,200 (Current)\n\n` +
+      `Generated by ${resolvedCompany.name} Revenue Management.`
+    );
+
+    if (client === 'gmail') {
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'yahoo') {
+      window.open(`https://compose.mail.yahoo.com/?subj=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else if (client === 'outlook') {
+      window.open(`https://outlook.live.com/mail/0/deeplink/compose?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <DocumentActionBar
@@ -685,18 +1109,36 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left: Active Specials List (4 cols) */}
             <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-xs p-4 space-y-3 no-print">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Active Guest Specials</h3>
                   <span className="text-[11px] text-slate-500">{specials.length} campaigns active</span>
                 </div>
-                <button
-                  onClick={handleCreateNewSpecial}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New Special
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleDownloadAllSpecialsCatalog}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                    title="Download All Specials Catalog (HTML Dossier)"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                    title="Print All Specials Catalog (Universal Printer)"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={handleCreateNewSpecial}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    New Special
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
@@ -752,6 +1194,55 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                       <span className="text-[10px] text-emerald-600 font-semibold font-mono">
                         {(sp.hashtags || []).length} hashtags
                       </span>
+                    </div>
+
+                    {/* Quick Document & Sharing Actions on Card */}
+                    <div className="flex items-center gap-1.5 pt-2 mt-2 border-t border-slate-100 opacity-90 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadSpecialVoucher(sp);
+                        }}
+                        className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded transition"
+                        title="Download Voucher HTML"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareSpecialWhatsApp(sp);
+                        }}
+                        className="p-1 text-slate-500 hover:text-[#25D366] hover:bg-emerald-50 rounded transition"
+                        title="Share on WhatsApp"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareSpecialEmail(sp, 'gmail');
+                        }}
+                        className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                        title="Share via Gmail"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSpecialId(sp.id);
+                          setTimeout(() => window.print(), 100);
+                        }}
+                        className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition"
+                        title="Print Voucher"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1277,13 +1768,75 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-1 no-print">
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 no-print border-t border-slate-100">
                       <button
+                        type="button"
+                        onClick={() => handleDownloadMarketingAdobePdf(editSpecial.title, `Promo Code: ${editSpecial.promoCode} (${editSpecial.discountPercent}% Off)`, `${editSpecial.description}\nValid Until: ${editSpecial.validUntil}\nInclusions: ${(editSpecial.inclusions || []).join(', ')}\nHashtags: ${(editSpecial.hashtags || []).join(' ')}`)}
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        title="Download special as Adobe PDF with corporate branding"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download Adobe PDF
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSpecialVoucher(editSpecial)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        title="Download printable HTML voucher dossier"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download Voucher
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialWhatsApp(editSpecial)}
+                        className="px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        title="Share voucher directly on WhatsApp"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" />
+                        WhatsApp Voucher
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialEmail(editSpecial, 'gmail')}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                        title="Email voucher via Gmail"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-blue-600" />
+                        Gmail
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialEmail(editSpecial, 'outlook')}
+                        className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                        title="Email voucher via Outlook"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-sky-600" />
+                        Outlook
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialEmail(editSpecial, 'yahoo')}
+                        className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                        title="Email voucher via Yahoo"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-purple-600" />
+                        Yahoo
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => window.print()}
-                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        title="Print Special Voucher on any printer"
                       >
                         <Printer className="w-3.5 h-3.5 text-emerald-400" />
-                        Print Special Voucher
+                        Print Voucher
                       </button>
                     </div>
                   </div>
@@ -1338,7 +1891,8 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                           onClick={() => {
                             const fullCopy = `${editSpecial.title}\n\n${editSpecial.description}\n\n🥂 Exclusive Promo Code: ${editSpecial.promoCode} for ${editSpecial.discountPercent}% discount.\nValid until ${editSpecial.validUntil}.\n\nReserve direct at ${resolvedCompany.webAddress} or link in bio.\n\n${(editSpecial.hashtags || []).join(' ')}`;
                             navigator.clipboard.writeText(fullCopy);
-                            alert('Instagram caption & hashtags copied to clipboard!');
+                            setSaveSuccessMsg('Instagram caption & hashtags copied to clipboard!');
+                            setTimeout(() => setSaveSuccessMsg(null), 3000);
                           }}
                           className="flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-bold"
                         >
@@ -1359,6 +1913,37 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                           {(editSpecial.hashtags || []).join(' ')}
                         </span>
                       </p>
+
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-200 no-print">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSocialPost('Instagram_1080x1080', editSpecial.title, `${editSpecial.title}\n\n${editSpecial.description}\n\nCode: ${editSpecial.promoCode} (${editSpecial.discountPercent}% Off)\n${(editSpecial.hashtags || []).join(' ')}`)}
+                          className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 rounded-lg font-bold border border-slate-300 text-[11px] flex items-center gap-1 transition"
+                        >
+                          <Download className="w-3 h-3" /> Download Post
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShareSpecialWhatsApp(editSpecial)}
+                          className="px-2.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+                        >
+                          <WhatsAppIcon className="w-3 h-3 text-slate-950" /> WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShareSpecialEmail(editSpecial, 'gmail')}
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-bold border border-blue-200 text-[11px] flex items-center gap-1 transition"
+                        >
+                          <Mail className="w-3 h-3 text-blue-600" /> Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+                        >
+                          <Printer className="w-3 h-3" /> Print
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1366,7 +1951,7 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                 {/* AUTO PREVIEW 3: FACEBOOK / TWITTER (16:9) */}
                 {autoPreviewMode === 'facebook' && (
                   <div className="space-y-3">
-                    <div className="aspect-[16/9] rounded-2xl overflow-hidden relative shadow-xl border border-slate-800 bg-slate-950 flex flex-col justify-between p-6 md:p-8 text-white">
+                    <div className="aspect-[16/9] rounded-2xl overflow-hidden relative shadow-xl border border-slate-800 bg-slate-950 flex flex-col justify-between p-6 md:p-8 text-white printable-area">
                       {editSpecial.imageUrl && (
                         <div className="absolute inset-0 z-0">
                           <img 
@@ -1406,6 +1991,37 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1 no-print">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSocialPost('Facebook_1200x630', editSpecial.title, `${editSpecial.title}\n\n${editSpecial.description}\n\nCode: ${editSpecial.promoCode}\nBook Direct: ${resolvedCompany.webAddress}`)}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold border border-slate-300 flex items-center gap-1.5 transition"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Download Banner
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialWhatsApp(editSpecial)}
+                        className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5" /> Share WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleShareSpecialEmail(editSpecial, 'gmail')}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-xs font-bold border border-blue-200 flex items-center gap-1.5 transition"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-blue-600" /> Share Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Print Banner
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1440,17 +2056,49 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex justify-end pt-1">
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1 no-print">
                       <button
+                        type="button"
+                        onClick={() => {
+                          const waText = `🌊 *${resolvedCompany.name} Exclusive Guest Special*\n\n✨ *${editSpecial.title}*\n${editSpecial.description}\n\n🎁 *Privilege:* ${editSpecial.discountPercent}% Discount\n🔑 *Code:* ${editSpecial.promoCode}\n📅 *Valid:* ${editSpecial.validUntil}\n\nBook direct: ${resolvedCompany.webAddress}\n\n${(editSpecial.hashtags || []).join(' ')}`;
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waText)}`, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5" />
+                        Open in WhatsApp
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => {
                           const waText = `🌊 *${resolvedCompany.name} Exclusive Guest Special*\n\n✨ *${editSpecial.title}*\n${editSpecial.description}\n\n🎁 *Privilege:* ${editSpecial.discountPercent}% Discount\n🔑 *Code:* ${editSpecial.promoCode}\n📅 *Valid:* ${editSpecial.validUntil}\n\nBook direct: ${resolvedCompany.webAddress}\n\n${(editSpecial.hashtags || []).join(' ')}`;
                           navigator.clipboard.writeText(waText);
-                          alert('WhatsApp broadcast message copied to clipboard!');
+                          setSaveSuccessMsg('WhatsApp broadcast message copied to clipboard!');
+                          setTimeout(() => setSaveSuccessMsg(null), 3000);
                         }}
                         className="px-3 py-1.5 bg-[#128C7E] hover:bg-[#075E54] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
                       >
-                        <WhatsAppIcon className="w-3.5 h-3.5" />
-                        Copy WhatsApp Blast
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy Blast
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSocialPost('WhatsApp_Blast', editSpecial.title, `🌊 *${resolvedCompany.name}*\n${editSpecial.title}\n${editSpecial.description}\nPromo Code: ${editSpecial.promoCode}`)}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold border border-slate-300 transition flex items-center gap-1"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        Print Flyer
                       </button>
                     </div>
                   </div>
@@ -1621,17 +2269,52 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left: Official Letterhead Preview (6 cols) */}
             <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 md:p-8 space-y-6 printable-area">
-              <div className="flex items-center justify-between border-b pb-3 no-print">
+              <div className="flex flex-wrap items-center justify-between border-b pb-3 no-print gap-2">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-emerald-600" />
                   Official Corporate Letterhead
                 </h4>
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print Letterhead
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDownloadLetterhead}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition shadow-xs"
+                    title="Download Letterhead HTML/Doc file"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = `🌊 *${resolvedCompany.name} Official Letterhead*\n"${resolvedCompany.tagline}"\n${resolvedCompany.address}\nTel: ${resolvedCompany.telephone}\nWeb: ${resolvedCompany.webAddress}`;
+                      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1 transition shadow-xs"
+                    title="Share Letterhead details via WhatsApp"
+                  >
+                    <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" /> WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const subject = encodeURIComponent(`${resolvedCompany.name} - Official Corporate Letterhead`);
+                      const body = encodeURIComponent(`Dear Valued Guest,\n\nPlease find the official corporate letterhead credentials for ${resolvedCompany.name}.\n\nAddress: ${resolvedCompany.address}\nTelephone: ${resolvedCompany.telephone}\nEmail: ${resolvedCompany.email}\nWeb: ${resolvedCompany.webAddress}\n\nWarm regards,\n${resolvedCompany.salesPerson}`);
+                      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                    title="Email Letterhead via Gmail"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-blue-600" /> Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs hover:bg-slate-800 transition"
+                    title="Print Letterhead on any printer"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-emerald-400" /> Print Letterhead
+                  </button>
+                </div>
               </div>
 
               {/* Letterhead Header with Logo */}
@@ -1693,13 +2376,23 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                   </p>
                 </div>
 
-                <button
-                  onClick={handleCopyHtmlEmailSignature}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  {copiedSignature ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedSignature ? 'HTML Signature Copied!' : 'Copy HTML Signature'}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDownloadEmailSignatureHtml}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                    title="Download signature as HTML file"
+                  >
+                    <Download className="w-3.5 h-3.5" /> HTML File
+                  </button>
+                  <button
+                    onClick={handleCopyHtmlEmailSignature}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    {copiedSignature ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedSignature ? 'HTML Signature Copied!' : 'Copy HTML Signature'}
+                  </button>
+                </div>
               </div>
 
               {/* Rendered Email Signature Box */}
@@ -1779,19 +2472,47 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Instagram Post Template */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
               <span className="flex items-center gap-1.5 font-bold text-xs text-pink-600">
                 <InstagramIcon className="w-4 h-4" /> Instagram Square (1080x1080)
               </span>
-              <button
-                onClick={() => alert('Instagram caption & asset copied!')}
-                className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-semibold"
-              >
-                <Copy className="w-3.5 h-3.5" /> Copy
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadSocialPost('Instagram_Square_1080', 'Where Sunset Reflections Meet Pure Serenity', `Unwind in timeless luxury at ${resolvedCompany.name}. Soak in breathtaking lagoon sunsets from your private panoramic balcony. 🥂 Link in bio to reserve your escape.\n\n${hashtagsList.join(' ')}`)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                  title="Download Instagram post asset"
+                >
+                  <Download className="w-3 h-3" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareSocialWhatsApp('Instagram Post', `🌊 *${resolvedCompany.name} - Knysna Lagoon Sanctuary*\nWhere Sunset Reflections Meet Pure Serenity.\n\nUnwind in timeless luxury. Link in bio to reserve.\n\n${hashtagsList.join(' ')}`)}
+                  className="px-2.5 py-1 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <WhatsAppIcon className="w-3 h-3 text-slate-950" /> WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <Printer className="w-3 h-3" /> Print
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Where Sunset Reflections Meet Pure Serenity.\n\nUnwind in timeless luxury at ${resolvedCompany.name}. Soak in breathtaking lagoon sunsets from your private panoramic balcony. 🥂 Link in bio to reserve your escape.\n\n${hashtagsList.join(' ')}`);
+                    setSaveSuccessMsg('Instagram post caption copied to clipboard!');
+                    setTimeout(() => setSaveSuccessMsg(null), 3000);
+                  }}
+                  className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-semibold px-2 py-1 rounded bg-slate-50 border border-slate-200"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copy
+                </button>
+              </div>
             </div>
 
-            <div className="aspect-square rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 p-6 text-white flex flex-col justify-between shadow-inner">
+            <div className="aspect-square rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950 p-6 text-white flex flex-col justify-between shadow-inner printable-area">
               <div className="flex items-center justify-between">
                 <span className="font-serif-luxury text-sm font-bold text-emerald-400">
                   {resolvedCompany.name}
@@ -1827,19 +2548,46 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
 
           {/* Facebook Post Template */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
               <span className="flex items-center gap-1.5 font-bold text-xs text-blue-600">
                 <FacebookIcon className="w-4 h-4" /> Facebook Landscape Banner (1200x630)
               </span>
-              <button
-                onClick={() => alert('Facebook post text copied!')}
-                className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-semibold"
-              >
-                <Copy className="w-3.5 h-3.5" /> Copy
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadSocialPost('Facebook_Landscape_1200', 'Spring Lagoon Serenade Package', `Planning your next Garden Route retreat? Escape to ${resolvedCompany.name}. Exceptional hospitality, gourmet lagoon breakfasts, and tailored adventure itineraries.\n\nBook direct: ${resolvedCompany.webAddress}\n${hashtagsList.join(' ')}`)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                >
+                  <Download className="w-3 h-3" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareSocialWhatsApp('Facebook Banner', `🌊 *${resolvedCompany.name} Retreat Announcement*\nPlanning your next Garden Route retreat? Escape to ${resolvedCompany.name}.\n\nBook direct: ${resolvedCompany.webAddress}\n\n${hashtagsList.join(' ')}`)}
+                  className="px-2.5 py-1 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <WhatsAppIcon className="w-3 h-3 text-slate-950" /> WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <Printer className="w-3 h-3" /> Print
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Planning your next Garden Route retreat? Escape to ${resolvedCompany.name}. Exceptional hospitality, gourmet lagoon breakfasts, and tailored adventure itineraries. Book direct: ${resolvedCompany.webAddress}\n\n${hashtagsList.join(' ')}`);
+                    setSaveSuccessMsg('Facebook post text copied to clipboard!');
+                    setTimeout(() => setSaveSuccessMsg(null), 3000);
+                  }}
+                  className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-semibold px-2 py-1 rounded bg-slate-50 border border-slate-200"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copy
+                </button>
+              </div>
             </div>
 
-            <div className="aspect-[16/9] rounded-2xl bg-gradient-to-r from-blue-950 via-slate-900 to-emerald-950 p-6 text-white flex flex-col justify-between shadow-inner">
+            <div className="aspect-[16/9] rounded-2xl bg-gradient-to-r from-blue-950 via-slate-900 to-emerald-950 p-6 text-white flex flex-col justify-between shadow-inner printable-area">
               <div className="flex items-center justify-between">
                 <span className="font-serif-luxury text-base font-bold text-white">
                   {resolvedCompany.name}
@@ -1889,13 +2637,42 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                 Edit, add, or customize hashtags. Tags automatically sync into Instagram, Facebook, WhatsApp, and social preview templates.
               </p>
             </div>
-            <button
-              onClick={handleCopyHashtags}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0"
-            >
-              {copiedHash ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copiedHash ? 'Copied to Clipboard!' : 'Copy All Hashtags'}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleDownloadHashtags}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition shadow-2xs"
+                title="Download Hashtag Directory as text file"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-600" />
+                Download TXT
+              </button>
+              <button
+                type="button"
+                onClick={handleShareHashtagsWhatsApp}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold transition shadow-2xs"
+                title="Share hashtags list on WhatsApp"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" />
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-2xs"
+                title="Print Hashtag Cheatsheet"
+              >
+                <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                Print Cheatsheet
+              </button>
+              <button
+                onClick={handleCopyHashtags}
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0"
+              >
+                {copiedHash ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedHash ? 'Copied to Clipboard!' : 'Copy All Hashtags'}
+              </button>
+            </div>
           </div>
 
           {/* Add Hashtag Input Bar */}
@@ -2038,13 +2815,46 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
                 Detailed monthly performance, RevPAR, ADR, and occupancy rate metrics
               </p>
             </div>
-            <button
-              onClick={() => window.print()}
-              className="px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
-            >
-              <Printer className="w-3.5 h-3.5 text-emerald-400" />
-              Print Monthly Report
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleDownloadSalesReportCsv}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                title="Download CSV sales spreadsheet"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShareSalesReportEmail('gmail')}
+                className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                title="Share sales report via Email"
+              >
+                <Mail className="w-3.5 h-3.5 text-blue-600" />
+                Email Report
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const summary = `📊 *${resolvedCompany.name} Sales Performance Summary*\n• Jan: R 478,800 (90.3% Occ)\n• Feb: R 425,600 (89.4% Occ)\n• Mar: R 398,750 (78.0% Occ)\n• Jun (Oyster Fest): R 560,000 (97.2% Occ)\n• Sep (Current): R 458,200 (87.7% Occ)\n\nTotal YTD Gross: R 2,321,350 across luxury suites.`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(summary)}`, '_blank', 'noopener,noreferrer');
+                }}
+                className="px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                title="Share summary on WhatsApp"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" />
+                WhatsApp Report
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                title="Print Report on any printer"
+              >
+                <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                Print Monthly Report
+              </button>
+            </div>
           </div>
 
           <table className="w-full text-xs border-collapse">

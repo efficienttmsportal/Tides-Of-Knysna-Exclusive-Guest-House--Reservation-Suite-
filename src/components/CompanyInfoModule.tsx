@@ -4,6 +4,7 @@ import {
   Save, 
   RotateCcw, 
   Check, 
+  CheckCircle,
   Phone, 
   Mail, 
   MapPin, 
@@ -17,9 +18,14 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  Upload
+  Upload,
+  Printer,
+  Download,
+  Share2
 } from 'lucide-react';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { UploadedPolicyDocument } from './GuestFolderModule';
+import { WhatsAppIcon } from './GuestPortal';
 
 export interface CompanyInfoData {
   name: string;
@@ -94,6 +100,129 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
   const sigInputRef = React.useRef<HTMLInputElement>(null);
   const letterheadInputRef = React.useRef<HTMLInputElement>(null);
   const specialsInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Uploaded Estate Policies State (Synchronized across Admin and Guest Portal)
+  const [uploadedPolicies, setUploadedPolicies] = useState<UploadedPolicyDocument[]>(() => {
+    try {
+      const saved = localStorage.getItem('tok_uploaded_policy_docs_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load uploaded policies', e);
+    }
+    return [
+      {
+        id: 'up-pol-1',
+        title: 'TGCSA 5-Star Graded Guest Estate Bylaws & Code of Conduct',
+        category: 'Estate Bylaws',
+        strictness: 'Mandatory',
+        fileName: 'Tides_of_Knysna_Official_Bylaws_2026.pdf',
+        fileSize: '412 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-15 09:30',
+        uploadedBy: 'Admin',
+        notes: 'Official Tourism Grading Council South Africa luxury estate compliance documentation.'
+      },
+      {
+        id: 'up-pol-2',
+        title: 'Knysna Ramsar Environmental Lagoon Protection Protocol',
+        category: 'Environmental Sanctuary',
+        strictness: 'Mandatory',
+        fileName: 'Knysna_Lagoon_Sanctuary_Quiet_Hours_Gazette.pdf',
+        fileSize: '284 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-18 14:10',
+        uploadedBy: 'Admin',
+        notes: 'Mandatory silence hours (22:00 - 07:00) and marine sanctuary protection guidelines.'
+      },
+      {
+        id: 'up-pol-3',
+        title: 'Water Safety, Heated Plunge Pool & Kayak Indemnity Protocol',
+        category: 'Safety & Indemnity',
+        strictness: 'Standard',
+        fileName: 'Kayak_and_Pool_Safety_Guidelines.pdf',
+        fileSize: '198 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-22 11:45',
+        uploadedBy: 'Admin',
+        notes: 'Certified lifejacket requirements and complimentary kayak navigation zone map.'
+      }
+    ];
+  });
+  const [policyUploadTitle, setPolicyUploadTitle] = useState('');
+  const [policyUploadCategory, setPolicyUploadCategory] = useState('Estate Protocol');
+  const [policyUploadStrictness, setPolicyUploadStrictness] = useState<'Mandatory' | 'Standard' | 'Information'>('Mandatory');
+  const [isUploadingPolicy, setIsUploadingPolicy] = useState(false);
+  const [policyNotice, setPolicyNotice] = useState<string | null>(null);
+
+  const handlePolicyUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPolicy(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const newPolicy: UploadedPolicyDocument = {
+        id: `up-pol-${Date.now()}`,
+        title: policyUploadTitle.trim() || file.name.replace(/\.[^/.]+$/, ""),
+        category: policyUploadCategory,
+        strictness: policyUploadStrictness,
+        fileName: file.name,
+        fileSize: `${Math.round(file.size / 1024)} KB`,
+        fileType: file.type || 'application/octet-stream',
+        uploadedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        uploadedBy: 'Admin',
+        dataUrl: reader.result as string,
+        notes: `Uploaded by Admin Manager via Company Info Profile.`
+      };
+
+      const updated = [newPolicy, ...uploadedPolicies];
+      setUploadedPolicies(updated);
+      try {
+        localStorage.setItem('tok_uploaded_policy_docs_v2', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Storage limit reached for policy dataUrl', err);
+      }
+      setIsUploadingPolicy(false);
+      setPolicyUploadTitle('');
+      setPolicyNotice(`Successfully uploaded policy document: "${newPolicy.title}"`);
+      setTimeout(() => setPolicyNotice(null), 4000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteUploadedPolicy = (id: string) => {
+    const updated = uploadedPolicies.filter(p => p.id !== id);
+    setUploadedPolicies(updated);
+    try {
+      localStorage.setItem('tok_uploaded_policy_docs_v2', JSON.stringify(updated));
+    } catch (e) {}
+    setPolicyNotice('Policy document removed from registry.');
+    setTimeout(() => setPolicyNotice(null), 3000);
+  };
+
+  const handleDownloadPolicyFile = (policy: UploadedPolicyDocument) => {
+    if (policy.dataUrl) {
+      const a = document.createElement('a');
+      a.href = policy.dataUrl;
+      a.download = policy.fileName;
+      a.click();
+    } else {
+      const sampleText = `TIDES OF KNYSNA - ESTATE POLICY\n\nTitle: ${policy.title}\nCategory: ${policy.category}\nStrictness: ${policy.strictness}\nUploaded: ${policy.uploadedAt}\n\nOfficial notice: All resident guests and visitors must comply with this estate policy.`;
+      const blob = new Blob([sampleText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = policy.fileName.endsWith('.txt') ? policy.fileName : `${policy.fileName}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setPolicyNotice(`Downloaded ${policy.title}`);
+    setTimeout(() => setPolicyNotice(null), 3000);
+  };
+
+  const handlePrintPolicy = () => {
+    window.print();
+  };
 
   const handleFileUpload = (field: keyof CompanyInfoData, file: File) => {
     const reader = new FileReader();
@@ -919,49 +1048,225 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
           </div>
         )}
 
-        {/* TAB 5: Policies & Operating Hours */}
+        {/* TAB 5: Policies & Operating Hours + Official Policy Document Uploads */}
         {activeSubTab === 'policies' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-sm">Guest Policies & Standard Operational Hours</h3>
-              <p className="text-xs text-slate-500">Automatically shown to incoming guests in their Guest Portal & confirmation emails.</p>
+          <div className="space-y-6">
+            {policyNotice && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>{policyNotice}</span>
+                </div>
+                <button onClick={() => setPolicyNotice(null)} className="text-emerald-700">✕</button>
+              </div>
+            )}
+
+            {/* Standard Text Policies */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-sm">Guest Policies & Standard Operational Hours</h3>
+                <p className="text-xs text-slate-500">Automatically shown to incoming guests in their Guest Portal & confirmation emails.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Check-In Window & Procedures
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.checkInTime}
+                    onChange={(e) => handleChange('checkInTime', e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Check-Out Window & Departure Inspections
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.checkOutTime}
+                    onChange={(e) => handleChange('checkOutTime', e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Standard Cancellation & Refund Policy
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.cancellationPolicy}
+                    onChange={(e) => handleChange('cancellationPolicy', e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Check-In Window & Procedures
-                </label>
-                <input
-                  type="text"
-                  value={formData.checkInTime}
-                  onChange={(e) => handleChange('checkInTime', e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
+            {/* Official Policy Document Uploads & Repository */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-bold text-slate-900 text-sm">Official Estate Policy Documents & Legal Bylaws</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Upload official estate policy PDFs, terms, and guidelines. Synced directly to Guest Portal for guest download and printing.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePrintPolicy}
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto"
+                  title="Print all policy records on any printer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-slate-600" />
+                  Print Policy Manifest
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Check-Out Window & Departure Inspections
-                </label>
-                <input
-                  type="text"
-                  value={formData.checkOutTime}
-                  onChange={(e) => handleChange('checkOutTime', e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
+              {/* Upload Form Box */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <strong className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    Upload New Policy Document (PDF, Word, Text, Image)
+                  </strong>
+                  <span className="text-[10px] text-slate-400">Universal printer-ready format</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={policyUploadTitle}
+                    onChange={(e) => setPolicyUploadTitle(e.target.value)}
+                    placeholder="Document Title (e.g. Pet & Service Animal Protocol)"
+                    className="px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+
+                  <select
+                    value={policyUploadCategory}
+                    onChange={(e) => setPolicyUploadCategory(e.target.value)}
+                    className="px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="Estate Bylaws">Estate Bylaws</option>
+                    <option value="Environmental Sanctuary">Environmental Sanctuary</option>
+                    <option value="Safety & Indemnity">Safety & Indemnity</option>
+                    <option value="Quiet Hours & Noise">Quiet Hours & Noise</option>
+                    <option value="Pool & Plunge Protocol">Pool & Plunge Protocol</option>
+                    <option value="Pet Policy">Pet Policy</option>
+                    <option value="Cancellation & Refund">Cancellation & Refund</option>
+                    <option value="VIP Resident Privileges">VIP Resident Privileges</option>
+                  </select>
+
+                  <label className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition shadow-xs">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingPolicy ? 'Uploading...' : 'Select File to Upload'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                      onChange={handlePolicyUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Standard Cancellation & Refund Policy
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.cancellationPolicy}
-                  onChange={(e) => handleChange('cancellationPolicy', e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
+              {/* Uploaded Policies Registry */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
+                  <span>Registered Policy Archives ({uploadedPolicies.length} Active Documents)</span>
+                  <span className="text-[11px] text-emerald-700">Live in Guest Portal</span>
+                </div>
+
+                {uploadedPolicies.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
+                    No policy documents uploaded yet. Upload your first PDF or document above.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                    {uploadedPolicies.map((pol) => (
+                      <div key={pol.id} className="p-4 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className="p-2 rounded-xl bg-blue-50 text-blue-700 shrink-0 mt-0.5">
+                            <FileText className="w-4 h-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <strong className="text-slate-900 text-xs">{pol.title}</strong>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {pol.category}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                pol.strictness === 'Mandatory'
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {pol.strictness}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                              <span>File: {pol.fileName}</span>
+                              <span>•</span>
+                              <span>Size: {pol.fileSize}</span>
+                              <span>•</span>
+                              <span>Uploaded: {pol.uploadedAt} by {pol.uploadedBy}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPolicyFile(pol)}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold flex items-center gap-1.5 transition text-xs"
+                            title="Download Policy File"
+                          >
+                            <Download className="w-3.5 h-3.5 text-slate-600" />
+                            Download
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handlePrintPolicy}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-xl font-bold flex items-center gap-1.5 transition text-xs"
+                            title="Print policy documentation on any printer"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                            Print
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const text = `📜 *ESTATE POLICY & HOUSE RULES*\n*${pol.title}*\nCategory: ${pol.category} (${pol.strictness})\nPlease review our official retreat guidelines. Download link: https://tidesofknysna.co.za/policies?doc=${pol.id}`;
+                              window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                            }}
+                            className="p-1.5 bg-[#25D366]/20 hover:bg-[#25D366]/30 text-emerald-900 border border-[#25D366]/40 rounded-xl transition"
+                            title="Share policy via WhatsApp"
+                          >
+                            <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUploadedPolicy(pol.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                            title="Remove policy"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

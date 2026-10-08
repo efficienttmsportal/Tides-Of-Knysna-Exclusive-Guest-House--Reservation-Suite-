@@ -24,25 +24,31 @@ import {
   Compass,
   AlertTriangle,
   History,
-  Clock
+  Clock,
+  FolderOpen
 } from 'lucide-react';
 import { DocumentActionBar } from './DocumentActionBar';
 import { DeleteOldReservationsModal } from './DeleteOldReservationsModal';
 import { Reservation, DocumentAttachment, PaymentMethod, PaymentStatus } from '../types';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { CompanyInfoData } from './CompanyInfoModule';
+import { GuestFolderModule } from './GuestFolderModule';
 
 interface ReservationsModuleProps {
   reservations: Reservation[];
   onUpdateReservations: (updated: Reservation[]) => void;
+  companyInfo?: CompanyInfoData;
 }
 
 export const ReservationsModule: React.FC<ReservationsModuleProps> = ({
   reservations,
   onUpdateReservations,
+  companyInfo,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResId, setSelectedResId] = useState<string>(reservations[0]?.id || '');
   const [isEditing, setIsEditing] = useState(false);
+  const [activeGuestFolderReservation, setActiveGuestFolderReservation] = useState<Reservation | null>(null);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [showDeleteOldModal, setShowDeleteOldModal] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'upcoming' | 'old'>('all');
@@ -372,6 +378,17 @@ export const ReservationsModule: React.FC<ReservationsModuleProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveGuestFolderReservation(res);
+                          }}
+                          className="p-1 rounded transition text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                          title="Open Guest Folder, Invoices & Letters"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" />
+                        </button>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900 text-white">
                           Suite {res.roomNumber}
                         </span>
@@ -466,6 +483,18 @@ export const ReservationsModule: React.FC<ReservationsModuleProps> = ({
               >
                 Save Reservation
               </button>
+
+              {activeReservation && (
+                <button
+                  type="button"
+                  onClick={() => setActiveGuestFolderReservation(activeReservation)}
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm border border-slate-700"
+                  title="Open full guest dossier with Tax Invoice, receipts, letters & policies"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                  Guest Folder & Invoicing
+                </button>
+              )}
 
               {formData.id && (
                 activeReservation && isOldReservation(activeReservation) ? (
@@ -1013,6 +1042,20 @@ export const ReservationsModule: React.FC<ReservationsModuleProps> = ({
         onDeleteSelected={handleDeleteOldSelected}
         onDeleteAll={handleDeleteAllOld}
       />
+
+      {/* Resident Guest Folder & Invoicing Dossier Modal */}
+      {activeGuestFolderReservation && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto no-print">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-4 sm:p-6 my-6 shadow-2xl relative max-h-[92vh] overflow-y-auto border border-slate-200">
+            <GuestFolderModule 
+              reservation={activeGuestFolderReservation}
+              companyInfo={companyInfo}
+              isAdminView={true}
+              onClose={() => setActiveGuestFolderReservation(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

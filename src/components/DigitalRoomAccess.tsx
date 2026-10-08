@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { Reservation } from '../types';
 import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
+import { WhatsAppIcon } from './GuestPortal';
+import { GUEST_HOUSE_INFO } from '../data/initialData';
 
 export interface MaintenanceTicket {
   id: string;
@@ -395,6 +397,32 @@ export const DigitalRoomAccess: React.FC<DigitalRoomAccessProps> = ({
                 </span>
                 <span className="text-[11px] text-slate-500">Keypad entry code</span>
               </div>
+
+              {/* WhatsApp PIN Share & Direct Support */}
+              <div className="pt-1 flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pin = `*${reservation.roomNumber}${reservation.customerSurname.length}7#`;
+                    const text = `🔑 *Suite ${reservation.roomNumber} Keyless Entry Code:* ${pin}\n📍 14 Waterfront Promenade, Knysna Lagoon Vista\n📞 Duty Manager: ${GUEST_HOUSE_INFO.mobile}`;
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5 transition"
+                  title="Forward door PIN to travel partner via WhatsApp"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                  <span>WhatsApp Door PIN</span>
+                </button>
+                <a
+                  href={`https://wa.me/${GUEST_HOUSE_INFO.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello Eleanor, I am standing outside Suite ${reservation.roomNumber} and need assistance unlocking my door.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5" />
+                  <span>WhatsApp Door Help</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -415,12 +443,24 @@ export const DigitalRoomAccess: React.FC<DigitalRoomAccessProps> = ({
             </p>
           </div>
 
-          <button
-            onClick={() => setShowNewTicketModal(true)}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-          >
-            <Plus className="w-4 h-4" /> Report Issue / Request Service
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={`https://wa.me/${GUEST_HOUSE_INFO.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello Eleanor, emergency service requested for Suite ${reservation.roomNumber}. Details: ...`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              title="Message Duty Engineer directly on WhatsApp"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5" />
+              <span>WhatsApp Duty Butler</span>
+            </a>
+            <button
+              onClick={() => setShowNewTicketModal(true)}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <Plus className="w-4 h-4" /> Report Issue / Request Service
+            </button>
+          </div>
         </div>
 
         {ticketSuccessNotice && (

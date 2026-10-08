@@ -17,13 +17,17 @@ import {
   ShieldAlert, 
   Smartphone,
   ChevronRight,
-  Filter
+  Filter,
+  Edit3,
+  Trash2,
+  Clock
 } from 'lucide-react';
 import { AttractionItem } from '../types';
 import { DocumentActionBar } from './DocumentActionBar';
 import { AttractionQrModal } from './AttractionQrModal';
 import { PrintableQrSheetModal } from './PrintableQrSheetModal';
 import { AttractionsQrStation } from './AttractionsQrStation';
+import { getAttractionStatus } from '../utils/attractionUtils';
 
 interface AttractionsModuleProps {
   initialAttractions: AttractionItem[];
@@ -46,6 +50,7 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
   const [activeQrAttraction, setActiveQrAttraction] = useState<AttractionItem | null>(null);
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
   const [isAddVenueOpen, setIsAddVenueOpen] = useState(false);
+  const [editingAttraction, setEditingAttraction] = useState<AttractionItem | null>(null);
 
   // New venue form state
   const [newVenue, setNewVenue] = useState<Partial<AttractionItem>>({
@@ -57,8 +62,29 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
     website: 'https://',
     address: '',
     distanceFromGuestHouse: '2.5 km',
-    highlights: ['Scenic Views', 'Guest Favorite']
+    highlights: ['Scenic Views', 'Guest Favorite'],
+    openingTime: '08:00',
+    closingTime: '17:00',
+    recommendedDuration: '2 hours'
   });
+
+  const handleEditVenueSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAttraction) return;
+
+    setAttractions(prev => prev.map(a => a.id === editingAttraction.id ? editingAttraction : a));
+    setEditingAttraction(null);
+  };
+
+  const handleDeleteVenue = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this venue recommendation?')) {
+      setAttractions(prev => prev.filter(a => a.id !== id));
+      if (stationAttraction?.id === id) {
+        const remaining = attractions.filter(a => a.id !== id);
+        if (remaining.length > 0) setStationAttraction(remaining[0]);
+      }
+    }
+  };
 
   // Extract unique categories & regions
   const categories = useMemo(() => {
@@ -101,7 +127,10 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
       website: newVenue.website || 'https://www.tidesofknysna.co.za',
       address: newVenue.address || 'Knysna, Garden Route',
       distanceFromGuestHouse: newVenue.distanceFromGuestHouse || '3 km',
-      highlights: newVenue.highlights || ['Concierge Recommendation']
+      highlights: newVenue.highlights || ['Concierge Recommendation'],
+      openingTime: newVenue.openingTime || '08:00',
+      closingTime: newVenue.closingTime || '17:00',
+      recommendedDuration: newVenue.recommendedDuration || '2 hours'
     };
 
     setAttractions(prev => [created, ...prev]);
@@ -280,19 +309,40 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
             }`}
           >
             <div>
-              {/* Category & Region Header */}
+              {/* Category, Region & Edit/Delete Actions */}
               <div className="flex items-center justify-between text-[11px] font-bold mb-2">
-                <span className={`px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                  att.isEmergency 
-                    ? 'bg-rose-100 text-rose-800' 
-                    : 'bg-emerald-50 text-emerald-800'
-                }`}>
-                  {att.category}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                    att.isEmergency 
+                      ? 'bg-rose-100 text-rose-800' 
+                      : 'bg-emerald-50 text-emerald-800'
+                  }`}>
+                    {att.category}
+                  </span>
 
-                <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px]">
-                  {att.region}
-                </span>
+                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px]">
+                    {att.region}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAttraction(att)}
+                    className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition"
+                    title="Edit venue details"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteVenue(att.id)}
+                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                    title="Delete venue"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Title & Description */}
@@ -339,6 +389,31 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
                   <span className="bg-slate-100 px-1.5 py-0.2 rounded text-[10px] font-semibold text-slate-600">
                     {att.distanceFromGuestHouse}
                   </span>
+                </div>
+
+                {/* Operating Hours, Duration & Status Indicator */}
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100/80 mt-1">
+                  <div className="flex items-center gap-2 text-slate-700 font-medium flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span>{att.openingTime && att.closingTime ? `${att.openingTime} - ${att.closingTime}` : att.isEmergency ? '24/7' : '08:00 - 17:00'}</span>
+                    </div>
+                    {att.recommendedDuration && (
+                      <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.2 rounded text-[10px]">
+                        ⏱️ {att.recommendedDuration}
+                      </span>
+                    )}
+                  </div>
+                  {(() => {
+                    const statusInfo = getAttractionStatus(att);
+                    return (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        statusInfo.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {statusInfo.label}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-0.5">
@@ -548,6 +623,41 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Opening Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 08:00"
+                    value={newVenue.openingTime || ''}
+                    onChange={(e) => setNewVenue(prev => ({ ...prev, openingTime: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Closing Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 17:00"
+                    value={newVenue.closingTime || ''}
+                    onChange={(e) => setNewVenue(prev => ({ ...prev, closingTime: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Recommended Duration</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2 hours"
+                  value={newVenue.recommendedDuration || ''}
+                  onChange={(e) => setNewVenue(prev => ({ ...prev, recommendedDuration: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Website URL</label>
                 <input
@@ -584,6 +694,203 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
                 >
                   Create & Generate QR Code
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* EDIT VENUE RECOMMENDATION MODAL                                            */}
+      {/* ========================================================================= */}
+      {editingAttraction && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingAttraction(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold font-serif-luxury text-lg text-white">
+                  Edit Venue Recommendation
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Update location, contact info, or mobile QR code details
+                </p>
+              </div>
+              <button 
+                onClick={() => setEditingAttraction(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditVenueSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Venue / Attraction Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editingAttraction.name}
+                  onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Category</label>
+                  <select
+                    value={editingAttraction.category}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, category: e.target.value as any }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    <option value="Sightseeing">Sightseeing</option>
+                    <option value="Ocean Tours">Ocean Tours</option>
+                    <option value="Eateries">Eateries</option>
+                    <option value="Wine Tasting">Wine Tasting</option>
+                    <option value="Markets">Markets</option>
+                    <option value="Festivals">Festivals</option>
+                    <option value="Car Hire">Car Hire</option>
+                    <option value="Air Travel">Air Travel</option>
+                    <option value="Emergency Services">Emergency Services</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Region</label>
+                  <select
+                    value={editingAttraction.region}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, region: e.target.value as any }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    <option value="Knysna">Knysna</option>
+                    <option value="Plettenberg Bay">Plettenberg Bay</option>
+                    <option value="Garden Route">Garden Route</option>
+                    <option value="Port Elizabeth / Gqeberha">Port Elizabeth / Gqeberha</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Full Physical Address</label>
+                <input
+                  type="text"
+                  required
+                  value={editingAttraction.address}
+                  onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, address: e.target.value }) : null)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={editingAttraction.contactNumber}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, contactNumber: e.target.value }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Distance from Tides</label>
+                  <input
+                    type="text"
+                    value={editingAttraction.distanceFromGuestHouse}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, distanceFromGuestHouse: e.target.value }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Opening Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 08:00"
+                    value={editingAttraction.openingTime || ''}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, openingTime: e.target.value }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Closing Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 17:00"
+                    value={editingAttraction.closingTime || ''}
+                    onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, closingTime: e.target.value }) : null)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Recommended Duration</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2 hours"
+                  value={editingAttraction.recommendedDuration || ''}
+                  onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, recommendedDuration: e.target.value }) : null)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Website URL</label>
+                <input
+                  type="text"
+                  value={editingAttraction.website || ''}
+                  onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, website: e.target.value }) : null)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Concierge Recommendation Notes</label>
+                <textarea
+                  rows={2}
+                  value={editingAttraction.description}
+                  onChange={(e) => setEditingAttraction(prev => prev ? ({ ...prev, description: e.target.value }) : null)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteVenue(editingAttraction.id);
+                    setEditingAttraction(null);
+                  }}
+                  className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Venue</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAttraction(null)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl shadow-sm transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </form>
           </div>

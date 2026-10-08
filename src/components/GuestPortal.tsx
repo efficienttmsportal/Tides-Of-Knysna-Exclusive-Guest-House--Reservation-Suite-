@@ -45,7 +45,9 @@ import {
   Edit,
   Eye,
   RefreshCw,
-  FileCheck
+  FileCheck,
+  FolderOpen,
+  Download
 } from 'lucide-react';
 import { Reservation, AttractionItem, MarketingSpecial } from '../types';
 import { ATTRACTIONS_DIRECTORY, GUEST_HOUSE_INFO, INITIAL_SPECIALS } from '../data/initialData';
@@ -53,6 +55,13 @@ import { CompanyInfoData } from './CompanyInfoModule';
 import { DigitalRoomAccess } from './DigitalRoomAccess';
 import { DigitalSignatureBlock } from './DigitalSignatureBlock';
 import { GuestSatisfactionSurvey } from './GuestSatisfactionSurvey';
+import { GuestFolderModule, UploadedPolicyDocument } from './GuestFolderModule';
+
+export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.711 1.456h.005c6.554 0 11.89-5.336 11.893-11.893a11.82 11.82 0 00-3.48-8.413z"/>
+  </svg>
+);
 
 export interface EstatePolicyItem {
   id: string;
@@ -141,12 +150,63 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
 
   // UI state inside portal
   const [activePortalTab, setActivePortalTab] = useState<
-    'digitalkey' | 'stay' | 'survey' | 'specials' | 'policies' | 'requests' | 'recommendations' | 'concierge'
+    'digitalkey' | 'stay' | 'survey' | 'specials' | 'policies' | 'requests' | 'recommendations' | 'concierge' | 'guestfolder'
   >('digitalkey');
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [portalAdminNotice, setPortalAdminNotice] = useState<string | null>(null);
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
+
+  // Uploaded Official Policy Documents (Synchronized with Admin Portal)
+  const [uploadedPolicies, setUploadedPolicies] = useState<UploadedPolicyDocument[]>(() => {
+    try {
+      const saved = localStorage.getItem('tok_uploaded_policy_docs_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load uploaded policies in guest portal', e);
+    }
+    return [
+      {
+        id: 'up-pol-1',
+        title: 'TGCSA 5-Star Graded Guest Estate Bylaws & Code of Conduct',
+        category: 'Estate Bylaws',
+        strictness: 'Mandatory',
+        fileName: 'Tides_of_Knysna_Official_Bylaws_2026.pdf',
+        fileSize: '412 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-15 09:30',
+        uploadedBy: 'Admin',
+        notes: 'Official Tourism Grading Council South Africa luxury estate compliance documentation.'
+      },
+      {
+        id: 'up-pol-2',
+        title: 'Knysna Ramsar Environmental Lagoon Protection Protocol',
+        category: 'Environmental Sanctuary',
+        strictness: 'Mandatory',
+        fileName: 'Knysna_Lagoon_Sanctuary_Quiet_Hours_Gazette.pdf',
+        fileSize: '284 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-18 14:10',
+        uploadedBy: 'Admin',
+        notes: 'Mandatory silence hours (22:00 - 07:00) and marine sanctuary protection guidelines.'
+      },
+      {
+        id: 'up-pol-3',
+        title: 'Water Safety, Heated Plunge Pool & Kayak Indemnity Protocol',
+        category: 'Safety & Indemnity',
+        strictness: 'Standard',
+        fileName: 'Kayak_and_Pool_Safety_Guidelines.pdf',
+        fileSize: '198 KB',
+        fileType: 'application/pdf',
+        uploadedAt: '2026-09-22 11:45',
+        uploadedBy: 'Admin',
+        notes: 'Certified lifejacket requirements and complimentary kayak navigation zone map.'
+      }
+    ];
+  });
+  const [guestPolicyUploadTitle, setGuestPolicyUploadTitle] = useState('');
+  const [guestPolicyCategory, setGuestPolicyCategory] = useState('Guest Signed Agreement');
+  const [isGuestUploadingPolicy, setIsGuestUploadingPolicy] = useState(false);
 
   // Estate Policies State (Loaded & Editable by Admin)
   const [policies, setPolicies] = useState<EstatePolicyItem[]>(() => {
@@ -196,6 +256,60 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
     }
   };
 
+  const handleGuestPolicyUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsGuestUploadingPolicy(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const newPolicy: UploadedPolicyDocument = {
+        id: `up-pol-${Date.now()}`,
+        title: guestPolicyUploadTitle.trim() || file.name.replace(/\.[^/.]+$/, ""),
+        category: guestPolicyCategory,
+        strictness: 'Mandatory',
+        fileName: file.name,
+        fileSize: `${Math.round(file.size / 1024)} KB`,
+        fileType: file.type || 'application/octet-stream',
+        uploadedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        uploadedBy: 'Guest',
+        dataUrl: reader.result as string,
+        notes: `Uploaded by Guest (${currentReservation?.customerName || ''} ${currentReservation?.customerSurname || ''}) via Resident Portal.`
+      };
+
+      const updated = [newPolicy, ...uploadedPolicies];
+      setUploadedPolicies(updated);
+      try {
+        localStorage.setItem('tok_uploaded_policy_docs_v2', JSON.stringify(updated));
+      } catch (err) {}
+      setIsGuestUploadingPolicy(false);
+      setGuestPolicyUploadTitle('');
+      setPortalAdminNotice(`✓ Successfully uploaded document: "${newPolicy.title}"`);
+      setTimeout(() => setPortalAdminNotice(null), 4000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDownloadPolicy = (policy: UploadedPolicyDocument) => {
+    if (policy.dataUrl) {
+      const a = document.createElement('a');
+      a.href = policy.dataUrl;
+      a.download = policy.fileName;
+      a.click();
+    } else {
+      const text = `TIDES OF KNYSNA - ESTATE POLICY\n\nTitle: ${policy.title}\nCategory: ${policy.category}\nStrictness: ${policy.strictness}\nUploaded: ${policy.uploadedAt}\n\nAll guests and visitors are requested to abide by these guidelines.`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = policy.fileName.endsWith('.txt') ? policy.fileName : `${policy.fileName}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setPortalAdminNotice(`Downloaded: ${policy.title}`);
+    setTimeout(() => setPortalAdminNotice(null), 3000);
+  };
+
   // Estate Broadcast Banner (Managed by Admin)
   const [broadcastNotice, setBroadcastNotice] = useState<string>(() => {
     return localStorage.getItem('tok_portal_admin_broadcast_v1') || 
@@ -206,6 +320,12 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
   const [isEmailPassModalOpen, setIsEmailPassModalOpen] = useState(false);
   const [emailToInput, setEmailToInput] = useState('');
   const [emailPassSentSuccess, setEmailPassSentSuccess] = useState(false);
+
+  // WhatsApp Stay Pass & Interactive FAB Modals
+  const [isWhatsAppPassModalOpen, setIsWhatsAppPassModalOpen] = useState(false);
+  const [whatsAppRecipientPhone, setWhatsAppRecipientPhone] = useState('');
+  const [isWhatsAppFabOpen, setIsWhatsAppFabOpen] = useState(false);
+  const [whatsAppNotice, setWhatsAppNotice] = useState<string | null>(null);
 
   const [isScanIdModalOpen, setIsScanIdModalOpen] = useState(false);
   const [uploadedIdDoc, setUploadedIdDoc] = useState<{ name: string; url: string; docType: string } | null>(null);
@@ -340,6 +460,87 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
     setTimeout(() => setBookingRequestSent(null), 3500);
   };
 
+  // WhatsApp Concierge Helpers
+  const dutyManagerPhone = companyInfo?.mobile || GUEST_HOUSE_INFO.mobile;
+  const cleanManagerPhone = dutyManagerPhone.replace(/[^0-9]/g, '');
+
+  const getStayPassWhatsAppText = (res: Reservation) => {
+    return (
+      `✨ *TIDES OF KNYSNA - GUEST STAY PASS* ✨\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 *Guest Name:* ${res.customerName} ${res.customerSurname}\n` +
+      `🔖 *Booking Reference:* ${res.reservationNumber}\n` +
+      `🏨 *Suite Allocation:* Room ${res.roomNumber} (${res.roomAllocation})\n` +
+      `📅 *Dates:* ${res.checkInDate} ➔ ${res.checkOutDate} (${res.totalNights} Nights)\n` +
+      `👥 *Guests:* ${res.numberOfGuests}\n` +
+      `🔑 *Suite Keypad PIN:* *${res.roomNumber}${res.customerSurname.length}7#\n` +
+      `📶 *Wi-Fi Network:* TidesExclusive_Guest5G\n` +
+      `🔐 *Wi-Fi Password:* LagoonView2026!\n` +
+      `⏰ *Check-In:* 14:00 - 20:00 | *Check-Out:* 10:30\n` +
+      `📍 *Address:* 14 Waterfront Promenade, Knysna Lagoon Vista\n` +
+      `📞 *24/7 Duty Manager (Eleanor):* ${dutyManagerPhone}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Tides of Knysna - Where Elegance Meets Adventures ★★★★★_`
+    );
+  };
+
+  const handleOpenWhatsAppStayPass = (targetPhone?: string) => {
+    if (!currentReservation) return;
+    const text = getStayPassWhatsAppText(currentReservation);
+    const phone = (targetPhone || currentReservation.contactNumber || dutyManagerPhone).replace(/[^0-9]/g, '');
+    const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleChatWithManagerWhatsApp = (customTopic?: string) => {
+    if (!currentReservation) {
+      const text = `Hello Eleanor, I am a guest contacting Tides of Knysna Concierge regarding my booking verification.`;
+      window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const intro = `Hello Eleanor, contacting you from Suite ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname}, Ref: ${currentReservation.reservationNumber}).`;
+    const fullText = customTopic ? `${intro}\n\n${customTopic}` : intro;
+    window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleWhatsAppButlerRequest = (reqType: string, reqDetails: string) => {
+    if (!currentReservation) return;
+    const msg = 
+      `🛎️ *NEW BUTLER SERVICE REQUEST*\n` +
+      `🏨 *Suite:* Room ${currentReservation.roomNumber} (${currentReservation.roomAllocation})\n` +
+      `👤 *Guest:* ${currentReservation.customerName} ${currentReservation.customerSurname} (Ref: ${currentReservation.reservationNumber})\n` +
+      `🏷️ *Category:* ${reqType}\n` +
+      `📝 *Details:* ${reqDetails}\n` +
+      `⏰ *Requested:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n\n` +
+      `Please confirm receipt and estimated delivery to our suite. Thank you!`;
+    window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleWhatsAppBookAttraction = (att: AttractionItem) => {
+    if (!currentReservation) return;
+    const msg =
+      `🧭 *CONCIERGE EXCURSION INQUIRY*\n` +
+      `🏨 *From Suite:* Room ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname})\n` +
+      `📍 *Attraction:* *${att.name}* (${att.category})\n` +
+      `🚗 *Location:* ${att.address} (~${att.distanceFromGuestHouse})\n` +
+      `⏰ *Hours:* ${att.openingTime || '08:00'} - ${att.closingTime || '17:00'} (Duration: ${att.recommendedDuration || '2 hours'})\n` +
+      `📞 *Venue Tel:* ${att.contactNumber}\n\n` +
+      `Hi Eleanor, could you please assist with availability, tickets, or transport arrangements for this experience?`;
+    window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleWhatsAppClaimSpecial = (sp: MarketingSpecial) => {
+    if (!currentReservation) return;
+    const msg =
+      `🎁 *RESIDENT SPECIAL OFFER CLAIM*\n` +
+      `🏨 *Suite:* Room ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname})\n` +
+      `🔖 *Special:* *${sp.title}*\n` +
+      `🏷️ *Promo Code:* ${sp.promoCode} (${sp.discountPercent}% Off)\n` +
+      `⏳ *Validity:* Until ${sp.validUntil}\n\n` +
+      `Hi Eleanor, please apply this privilege to our stay account and arrange any inclusions!`;
+    window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  };
+
   // Filter recommendations
   const categories = ['All', 'Sightseeing', 'Eateries', 'Wine Tasting', 'Ocean Tours', 'Car Hire', 'Emergency Services'];
   const filteredAttractions = useMemo(() => {
@@ -460,6 +661,34 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
           </div>
         </div>
 
+        {/* Instant WhatsApp Verification Support Card */}
+        <div className="bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-900 border border-emerald-500/40 rounded-3xl p-5 text-white flex flex-col sm:flex-row items-center justify-between gap-4 max-w-xl mx-auto shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] flex items-center justify-center shrink-0">
+              <WhatsAppIcon className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white text-sm">Need Login or Booking Help?</span>
+                <span className="text-[10px] bg-[#25D366] text-slate-950 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  24/7 Live
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Message Duty Manager Eleanor on WhatsApp for instant booking reference recovery.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleChatWithManagerWhatsApp('Hi Eleanor, I need assistance logging into my Tides of Knysna Guest Self-Service Portal.')}
+            className="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-md shrink-0 w-full sm:w-auto justify-center"
+          >
+            <WhatsAppIcon className="w-4 h-4" />
+            <span>Chat on WhatsApp</span>
+          </button>
+        </div>
+
         {/* Feature Highlights */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center max-w-3xl mx-auto">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
@@ -542,6 +771,15 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={() => setActivePortalTab('guestfolder')}
+              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition shadow-md"
+              title="Open full guest folder with Tax Invoice, receipts, welcome letters, policies and vouchers"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              Invoicing & Folder (14 Docs)
+            </button>
+
+            <button
               onClick={() => window.print()}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition shadow-xs"
               title="Print Stay Pass & Key Dossier (Laser, Inkjet, Adobe PDF & Universal Print Drivers)"
@@ -563,6 +801,27 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
             </button>
 
             <button
+              onClick={() => {
+                setWhatsAppRecipientPhone(currentReservation.contactNumber || '');
+                setIsWhatsAppPassModalOpen(true);
+              }}
+              className="px-3 py-1.5 bg-[#25D366]/20 hover:bg-[#25D366]/30 text-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-[#25D366]/40 transition shadow-xs"
+              title="Send stay pass, door PIN, and Wi-Fi credentials via WhatsApp"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+              WhatsApp Pass
+            </button>
+
+            <button
+              onClick={() => handleChatWithManagerWhatsApp()}
+              className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+              title="Chat live with Duty Manager & Concierge Eleanor Sterling on WhatsApp"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" />
+              WhatsApp Butler
+            </button>
+
+            <button
               onClick={() => setIsScanIdModalOpen(true)}
               className="px-3 py-1.5 bg-purple-900/60 hover:bg-purple-800 text-purple-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-700/60 transition shadow-xs"
               title="Scan or upload passport/ID document for swift registration"
@@ -578,6 +837,85 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
               <LogOut className="w-3.5 h-3.5" />
               Sign Out
             </button>
+          </div>
+        </div>
+
+        {/* ESSENTIAL RESIDENT STAY CREDENTIALS & SIGHTSEEING QUICK BAR */}
+        <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+          <div className="bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 space-y-1">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-emerald-400" /> Stay Dates & Window
+            </span>
+            <div className="font-bold text-white text-[11px] truncate">{currentReservation.checkInDate} → {currentReservation.checkOutDate}</div>
+            <span className="text-[10px] text-emerald-400 block font-semibold">{currentReservation.totalNights} Days / Nights Duration</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 space-y-1">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+              <Wifi className="w-3 h-3 text-emerald-400" /> High-Speed Wi-Fi
+            </span>
+            <div className="font-mono font-bold text-emerald-300 text-xs flex items-center justify-between">
+              <span>LagoonView2026!</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText('LagoonView2026!');
+                  setCopiedWifi(true);
+                  setTimeout(() => setCopiedWifi(false), 2000);
+                }}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/40"
+              >
+                {copiedWifi ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">SSID: TidesExclusive_Guest5G</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 space-y-1">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+              <Key className="w-3 h-3 text-amber-400" /> Suite Door PIN
+            </span>
+            <div className="font-mono font-bold text-amber-300 text-xs flex items-center justify-between">
+              <span>{roomPinCode}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(roomPinCode);
+                  setCopiedPin(true);
+                  setTimeout(() => setCopiedPin(false), 2000);
+                }}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/40"
+              >
+                {copiedPin ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">Suite {currentReservation.roomNumber} Keyless</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 space-y-1">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+              <Compass className="w-3 h-3 text-blue-400" /> Sightseeing Guide
+            </span>
+            <button
+              type="button"
+              onClick={() => setActivePortalTab('recommendations')}
+              className="text-left font-bold text-blue-300 hover:text-blue-200 text-[11px] block truncate"
+            >
+              {ATTRACTIONS_DIRECTORY.length} Curated Venues →
+            </button>
+            <span className="text-[10px] text-slate-400 block">Hours & Directions</span>
+          </div>
+
+          <div className="col-span-2 sm:col-span-4 lg:col-span-1 bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 space-y-1">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+              <Phone className="w-3 h-3 text-rose-400" /> 24/7 Emergency
+            </span>
+            <div className="font-mono font-bold text-white text-[11px] truncate">{dutyManagerPhone}</div>
+            <div className="text-[10px] text-rose-300 flex items-center gap-1 truncate">
+              <span>Police 10111</span>
+              <span>•</span>
+              <span>Hosp: +27 44 384 1083</span>
+            </div>
           </div>
         </div>
       </div>
@@ -707,6 +1045,21 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
           Front Desk & Transfers
         </button>
 
+        <button
+          onClick={() => setActivePortalTab('guestfolder')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shrink-0 ${
+            activePortalTab === 'guestfolder'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100 border border-emerald-300'
+          }`}
+        >
+          <FolderOpen className="w-4 h-4 text-emerald-600" />
+          My Invoicing & Guest Folder
+          <span className="text-[10px] bg-emerald-200 text-emerald-950 px-1.5 py-0.2 rounded font-bold border border-emerald-400">
+            14 Docs
+          </span>
+        </button>
+
         {/* ADMIN BUTTON IN GUEST PORTAL FOR HOUSEKEEPING & POLICY MANAGEMENT */}
         <button
           onClick={() => setIsAdminPanelOpen(true)}
@@ -770,6 +1123,19 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                     {copiedPin ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      const text = `🔑 *Suite ${currentReservation.roomNumber} Keypad PIN:* ${roomPinCode}\n📍 14 Waterfront Promenade, Knysna`;
+                      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="w-full py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5 transition"
+                    title="Send door PIN to travel partner on WhatsApp"
+                  >
+                    <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                    WhatsApp Door PIN
+                  </button>
+                </div>
                 <p className="text-[11px] text-slate-500">
                   Enter PIN followed by # on the digital touchpad outside Suite {currentReservation.roomNumber}.
                 </p>
@@ -798,7 +1164,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                 </div>
                 <button
                   onClick={handleCopyWifi}
-                  className="w-full py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 flex items-center justify-center gap-1.5 transition"
+                  className="w-full py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 flex items-center justify-center gap-1.5 transition mb-2"
                 >
                   {copiedWifi ? (
                     <>
@@ -811,6 +1177,17 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                       Copy Wi-Fi Password
                     </>
                   )}
+                </button>
+                <button
+                  onClick={() => {
+                    const text = `📶 *Tides of Knysna Wi-Fi Access*\nSSID: TidesExclusive_Guest5G\nPassword: LagoonView2026!\n📍 High-Speed Fibre in Suite ${currentReservation.roomNumber}`;
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="w-full py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5 transition"
+                  title="Share Wi-Fi credentials on WhatsApp"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                  Share Wi-Fi via WhatsApp
                 </button>
               </div>
             </div>
@@ -991,17 +1368,28 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
                   <span className="text-[11px] text-slate-500">
                     Concierge response guaranteed within 60 minutes.
                   </span>
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Submit Request to Butler
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleWhatsAppButlerRequest(newRequestType, newRequestDetails || 'Please contact our suite regarding special arrangements.')}
+                      className="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition"
+                      title="Send request immediately via WhatsApp to Butler"
+                    >
+                      <WhatsAppIcon className="w-3.5 h-3.5" />
+                      Send via WhatsApp
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Submit to Butler
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -1043,13 +1431,22 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
               <p className="text-xs text-slate-300">
                 Arriving in the next 2 hours or require immediate assistance?
               </p>
-              <div className="pt-1">
+              <div className="pt-1 flex flex-col gap-2">
                 <a
-                  href={`tel:${GUEST_HOUSE_INFO.mobile}`}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs transition"
+                  href={`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(`Hello Eleanor, urgent assistance requested for Suite ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname}).`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-lg text-xs transition"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" />
+                  Chat Butler on WhatsApp: {dutyManagerPhone}
+                </a>
+                <a
+                  href={`tel:${dutyManagerPhone}`}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg text-xs transition"
                 >
                   <Phone className="w-3.5 h-3.5" />
-                  Call Butler Direct: {GUEST_HOUSE_INFO.mobile}
+                  Call Butler Direct: {dutyManagerPhone}
                 </a>
               </div>
             </div>
@@ -1172,27 +1569,36 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                       )}
                     </div>
 
-                    <button
-                      onClick={() => handleRequestExcursion(item)}
-                      disabled={isAlreadyRequested || bookingRequestSent === item.id}
-                      className={`w-full py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                        isAlreadyRequested
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-default'
-                          : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm'
-                      }`}
-                    >
-                      {isAlreadyRequested ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          Concierge Arranging
-                        </>
-                      ) : (
-                        <>
-                          <BookmarkPlus className="w-3.5 h-3.5 text-emerald-400" />
-                          Request Concierge Booking
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRequestExcursion(item)}
+                        disabled={isAlreadyRequested || bookingRequestSent === item.id}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                          isAlreadyRequested
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-default'
+                            : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm'
+                        }`}
+                      >
+                        {isAlreadyRequested ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            Concierge Arranging
+                          </>
+                        ) : (
+                          <>
+                            <BookmarkPlus className="w-3.5 h-3.5 text-emerald-400" />
+                            Request Concierge Booking
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleWhatsAppBookAttraction(item)}
+                        className="px-2.5 py-2 bg-[#25D366]/20 hover:bg-[#25D366] text-emerald-900 hover:text-slate-950 border border-[#25D366]/40 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shrink-0"
+                        title="Book or inquire about this attraction via WhatsApp"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1219,10 +1625,21 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                 <p className="text-[11px] text-slate-500 mt-0.5">Available 07:00 - 22:00 daily.</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">Duty Manager Mobile & WhatsApp</span>
-                <span className="text-sm font-bold text-emerald-700">{GUEST_HOUSE_INFO.mobile}</span>
-                <p className="text-[11px] text-slate-500 mt-0.5">24/7 on-call for arrivals and guest emergencies.</p>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Duty Manager Mobile & WhatsApp</span>
+                  <span className="text-sm font-bold text-emerald-700">{dutyManagerPhone}</span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">24/7 on-call for arrivals and guest emergencies.</p>
+                </div>
+                <a
+                  href={`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(`Hello Eleanor, contacting you from Suite ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname}).`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs transition"
+                >
+                  <WhatsAppIcon className="w-4 h-4 text-slate-950" />
+                  Open WhatsApp Chat with Duty Manager
+                </a>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -1267,17 +1684,27 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => {
+                  const text = `🚗 *AIRPORT TRANSFER REQUEST*\n🏨 Suite ${currentReservation.roomNumber} (${currentReservation.customerName} ${currentReservation.customerSurname})\nHi Eleanor, please book an airport transfer for our party. Route: George Airport (GRJ) / Plett. Flight details: ...`;
+                  window.open(`https://wa.me/${cleanManagerPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                }}
+                className="flex-1 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" />
+                Book via WhatsApp
+              </button>
               <button
                 onClick={() => {
                   setActivePortalTab('requests');
                   setNewRequestType('Airport Transfer & Shuttles');
                   setNewRequestDetails('Please arrange private airport transfer from George Airport (GRJ). Flight details: [Insert flight number & arrival time].');
                 }}
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
               >
                 <Car className="w-3.5 h-3.5 text-emerald-400" />
-                Book Airport Transfer Now
+                Book In Portal
               </button>
             </div>
           </div>
@@ -1417,27 +1844,37 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                   </div>
                 </div>
 
-                <div className="p-5 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                <div className="p-5 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2 flex-wrap">
                   <span className="text-[11px] text-slate-400 font-medium">
                     Valid until: {sp.validUntil}
                   </span>
-                  <button
-                    onClick={() => {
-                      if (!currentReservation) return;
-                      const specialNote = `[Special Privilege Claimed: ${sp.title} (${sp.promoCode} - ${sp.discountPercent}% Off)]`;
-                      const updatedReqs = currentReservation.specialRequests 
-                        ? `${currentReservation.specialRequests} \n• ${specialNote}` 
-                        : `• ${specialNote}`;
-                      const updatedList = reservations.map(r => r.id === currentReservation.id ? { ...r, specialRequests: updatedReqs } : r);
-                      onUpdateReservations(updatedList);
-                      setSpecialClaimSuccess(`Successfully attached "${sp.title}" to your suite reservation! Front desk has been notified.`);
-                      setTimeout(() => setSpecialClaimSuccess(null), 5000);
-                    }}
-                    className="px-3.5 py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Request For Stay
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleWhatsAppClaimSpecial(sp)}
+                      className="px-3 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0"
+                      title="Claim this special via WhatsApp with Eleanor"
+                    >
+                      <WhatsAppIcon className="w-3.5 h-3.5" />
+                      Claim on WhatsApp
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!currentReservation) return;
+                        const specialNote = `[Special Privilege Claimed: ${sp.title} (${sp.promoCode} - ${sp.discountPercent}% Off)]`;
+                        const updatedReqs = currentReservation.specialRequests 
+                          ? `${currentReservation.specialRequests} \n• ${specialNote}` 
+                          : `• ${specialNote}`;
+                        const updatedList = reservations.map(r => r.id === currentReservation.id ? { ...r, specialRequests: updatedReqs } : r);
+                        onUpdateReservations(updatedList);
+                        setSpecialClaimSuccess(`Successfully attached "${sp.title}" to your suite reservation! Front desk has been notified.`);
+                        setTimeout(() => setSpecialClaimSuccess(null), 5000);
+                      }}
+                      className="px-3 py-2 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Request For Stay
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1461,20 +1898,36 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                     Official House Rules & Guest Protocol
                   </span>
                   <h3 className="text-lg font-bold font-serif-luxury text-slate-900">
-                    Estate Regulations & Operational Standards
+                    Estate Regulations, Legal Bylaws & Operational Standards
                   </h3>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => window.print()}
                   className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-                  title="Print House Rules for hard copy filing"
+                  title="Print House Rules for hard copy filing on any printer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   Print Policies (Laser/Inkjet)
                 </button>
+
+                <button
+                  onClick={() => {
+                    if (uploadedPolicies[0]) {
+                      handleDownloadPolicy(uploadedPolicies[0]);
+                    } else {
+                      window.print();
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                  title="Download offline policies dossier"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  Download Policies
+                </button>
+
                 <button
                   onClick={() => setIsAdminPanelOpen(true)}
                   className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
@@ -1485,7 +1938,112 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Uploaded Official Policy Documentation Repository */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  Official Uploaded Policy Documents & Gazette Notices ({uploadedPolicies.length} Available)
+                </h4>
+                <span className="text-[10px] text-slate-400">Downloadable & Printable</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {uploadedPolicies.map((up) => (
+                  <div key={up.id} className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 flex flex-col justify-between gap-3 text-xs">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-emerald-900 border border-emerald-300">
+                          {up.category}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {up.fileSize}
+                        </span>
+                      </div>
+                      <strong className="block text-slate-900 line-clamp-2">{up.title}</strong>
+                      <p className="text-[11px] text-slate-500">{up.notes || up.fileName}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-emerald-200/60">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadPolicy(up)}
+                        className="flex-1 py-1.5 bg-white hover:bg-emerald-100 text-emerald-900 rounded-lg font-bold border border-emerald-300 text-[11px] flex items-center justify-center gap-1 transition"
+                      >
+                        <Download className="w-3 h-3" />
+                        Download
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="p-1.5 bg-white hover:bg-emerald-100 text-slate-700 rounded-lg border border-emerald-200 transition"
+                        title="Print policy"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const text = `📜 *TIDES OF KNYSNA POLICY*\n*${up.title}*\nCategory: ${up.category}\nOfficial bylaws available on guest portal.`;
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="p-1.5 bg-[#25D366]/20 hover:bg-[#25D366]/30 text-emerald-900 rounded-lg border border-[#25D366]/40 transition"
+                        title="Share on WhatsApp"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Guest & Admin Upload Document Box */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3 no-print">
+                <div className="flex items-center justify-between">
+                  <strong className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    Upload Policy Agreement / Guest Acceptance File
+                  </strong>
+                  <span className="text-[10px] text-slate-400">PDF, DOCX, TXT, PNG, JPG</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={guestPolicyUploadTitle}
+                    onChange={(e) => setGuestPolicyUploadTitle(e.target.value)}
+                    placeholder="Document Title (e.g. Signed Pet Protocol)"
+                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+
+                  <select
+                    value={guestPolicyCategory}
+                    onChange={(e) => setGuestPolicyCategory(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="Guest Signed Agreement">Guest Signed Agreement</option>
+                    <option value="Estate Protocol">Estate Protocol</option>
+                    <option value="Environmental Sanctuary">Environmental Sanctuary</option>
+                    <option value="Safety & Indemnity">Safety & Indemnity</option>
+                    <option value="Special House Rules">Special House Rules</option>
+                  </select>
+
+                  <label className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition shadow-xs">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isGuestUploadingPolicy ? 'Uploading...' : 'Browse & Upload Document'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                      onChange={handleGuestPolicyUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Standard Estate Policies Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {policies.map((pol) => (
                 <div key={pol.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 flex flex-col justify-between">
                   <div className="space-y-2">
@@ -1520,7 +2078,41 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* WhatsApp Policy Inquiry Card */}
+            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#25D366]/20 text-[#25D366] flex items-center justify-center shrink-0">
+                  <WhatsAppIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <strong className="text-emerald-900 block">Questions About House Rules or Check-Out Times?</strong>
+                  <span className="text-emerald-700 text-[11px]">Chat directly with Front Desk & Estate Management on WhatsApp.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleChatWithManagerWhatsApp('Hi Eleanor, I have a question regarding estate policies and procedures during our stay.')}
+                className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-xs shrink-0"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" />
+                Ask on WhatsApp
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 8: GUEST FOLDER & COMPLETE INVOICING DOSSIER                          */}
+      {/* ========================================================================= */}
+      {activePortalTab === 'guestfolder' && (
+        <div className="space-y-6">
+          <GuestFolderModule 
+            reservation={currentReservation}
+            companyInfo={companyInfo}
+            isAdminView={false}
+          />
         </div>
       )}
 
@@ -1952,6 +2544,270 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
           </div>
         </div>
       )}
+
+      {/* WHATSAPP STAY PASS & ACCESS CREDENTIALS MODAL */}
+      {isWhatsAppPassModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-[#25D366]/20 text-slate-950 rounded-xl">
+                  <WhatsAppIcon className="w-5 h-5 text-emerald-600" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Send Stay Pass via WhatsApp</h3>
+                  <p className="text-[11px] text-slate-500">Dispatch door PIN, Wi-Fi, and booking credentials</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsWhatsAppPassModalOpen(false);
+                  setWhatsAppNotice(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Recipient Mobile Number (e.g. Guest or Travel Partner):
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    value={whatsAppRecipientPhone}
+                    onChange={(e) => setWhatsAppRecipientPhone(e.target.value)}
+                    placeholder="e.g. +27 82 555 4321"
+                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#25D366] outline-none font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setWhatsAppRecipientPhone(currentReservation.contactNumber || '')}
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold"
+                  >
+                    My Mobile
+                  </button>
+                </div>
+              </div>
+
+              {/* Message Preview Box */}
+              <div>
+                <span className="font-bold text-slate-700 block mb-1">WhatsApp Message Preview:</span>
+                <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 font-mono text-[11px] text-slate-800 whitespace-pre-line max-h-48 overflow-y-auto leading-relaxed">
+                  {getStayPassWhatsAppText(currentReservation)}
+                </div>
+              </div>
+
+              {whatsAppNotice && (
+                <div className="p-2.5 bg-emerald-100 text-emerald-900 rounded-xl font-bold text-xs flex items-center gap-1.5 animate-fade-in">
+                  <Check className="w-4 h-4 text-emerald-700" />
+                  {whatsAppNotice}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(getStayPassWhatsAppText(currentReservation));
+                    setWhatsAppNotice('WhatsApp message text copied to clipboard!');
+                    setTimeout(() => setWhatsAppNotice(null), 3000);
+                  }}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Text
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWhatsAppPassModalOpen(false);
+                      setWhatsAppNotice(null);
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenWhatsAppStayPass(whatsAppRecipientPhone);
+                      setWhatsAppNotice('Opened WhatsApp with stay pass!');
+                    }}
+                    className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 text-slate-950" />
+                    Open in WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FLOATING WHATSAPP CONCIERGE BUTTON & INTERACTIVE LAUNCHER                 */}
+      {/* ========================================================================= */}
+      <div className="fixed bottom-6 right-6 z-40 no-print flex flex-col items-end">
+        {/* Expanded Launcher Drawer */}
+        {isWhatsAppFabOpen && (
+          <div className="mb-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-in text-slate-900">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 p-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-[#25D366] text-slate-950 flex items-center justify-center font-bold">
+                    <WhatsAppIcon className="w-5 h-5" />
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-slate-900 rounded-full"></span>
+                </div>
+                <div>
+                  <h4 className="font-serif-luxury font-bold text-sm leading-tight">Knysna Concierge WhatsApp</h4>
+                  <p className="text-[10px] text-emerald-300">Eleanor Sterling • Typically replies in 5 min</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWhatsAppFabOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-full transition text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Actions List */}
+            <div className="p-3.5 space-y-2 text-xs bg-slate-50 max-h-80 overflow-y-auto">
+              <p className="text-[11px] text-slate-500 px-1">
+                Staying in <strong>Suite {currentReservation.roomNumber}</strong> ({currentReservation.customerName}). Select a topic to launch WhatsApp:
+              </p>
+
+              <button
+                onClick={() => {
+                  handleChatWithManagerWhatsApp('Hi Eleanor, I have a general inquiry regarding our stay at Tides of Knysna.');
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="w-full text-left p-2.5 bg-white hover:bg-emerald-50 rounded-xl border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">💬</span>
+                  <div>
+                    <strong className="block text-slate-800 group-hover:text-emerald-800">Direct Chat with Butler</strong>
+                    <span className="text-[10px] text-slate-500">24/7 dedicated guest communication</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+              </button>
+
+              <button
+                onClick={() => {
+                  handleChatWithManagerWhatsApp(`Hi Eleanor, I need assistance with our Suite ${currentReservation.roomNumber} door PIN or Wi-Fi credentials.`);
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="w-full text-left p-2.5 bg-white hover:bg-emerald-50 rounded-xl border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🔑</span>
+                  <div>
+                    <strong className="block text-slate-800 group-hover:text-emerald-800">Keypad PIN & Wi-Fi Help</strong>
+                    <span className="text-[10px] text-slate-500">Touchless BLE & door code support</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+              </button>
+
+              <button
+                onClick={() => {
+                  handleChatWithManagerWhatsApp(`Hi Eleanor, please arrange suite amenities / fresh towels / champagne for Suite ${currentReservation.roomNumber}.`);
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="w-full text-left p-2.5 bg-white hover:bg-emerald-50 rounded-xl border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🛎️</span>
+                  <div>
+                    <strong className="block text-slate-800 group-hover:text-emerald-800">Room Turndown & Amenities</strong>
+                    <span className="text-[10px] text-slate-500">Housekeeping and beverage service</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+              </button>
+
+              <button
+                onClick={() => {
+                  handleChatWithManagerWhatsApp(`Hi Eleanor, we would like to book an airport shuttle or dinner transfer for Suite ${currentReservation.roomNumber}.`);
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="w-full text-left p-2.5 bg-white hover:bg-emerald-50 rounded-xl border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🚗</span>
+                  <div>
+                    <strong className="block text-slate-800 group-hover:text-emerald-800">Airport & Dinner Transfers</strong>
+                    <span className="text-[10px] text-slate-500">Mercedes-Benz V-Class shuttle booking</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+              </button>
+
+              <button
+                onClick={() => {
+                  handleChatWithManagerWhatsApp(`Hi Eleanor, could we please inquire about late check-out availability for Suite ${currentReservation.roomNumber}?`);
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="w-full text-left p-2.5 bg-white hover:bg-emerald-50 rounded-xl border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">⏰</span>
+                  <div>
+                    <strong className="block text-slate-800 group-hover:text-emerald-800">Late Check-Out Inquiry</strong>
+                    <span className="text-[10px] text-slate-500">Extend your lagoon vista stay</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600" />
+              </button>
+            </div>
+
+            {/* Footer with stay pass button */}
+            <div className="p-3 bg-white border-t border-slate-200 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  handleOpenWhatsAppStayPass();
+                  setIsWhatsAppFabOpen(false);
+                }}
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                Share Complete Stay Pass
+              </button>
+              <span className="text-[10px] font-mono text-slate-400">
+                {dutyManagerPhone}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* The Main Round WhatsApp Trigger */}
+        <button
+          id="guest-portal-whatsapp-fab"
+          onClick={() => setIsWhatsAppFabOpen(!isWhatsAppFabOpen)}
+          className="relative group p-4 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-full shadow-2xl flex items-center gap-2.5 transition-transform duration-200 hover:scale-105 active:scale-95"
+          title="Open WhatsApp Concierge Hub"
+        >
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-600 border-2 border-white"></span>
+          </span>
+          <WhatsAppIcon className="w-6 h-6 text-slate-950" />
+          <span className="hidden sm:inline font-bold text-xs pr-1">
+            WhatsApp Concierge
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

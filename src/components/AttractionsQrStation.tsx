@@ -15,9 +15,11 @@ import {
   Sparkles,
   Maximize2,
   Check,
-  ChevronDown
+  ChevronDown,
+  Clock
 } from 'lucide-react';
 import { AttractionItem } from '../types';
+import { getAttractionStatus } from '../utils/attractionUtils';
 
 interface AttractionsQrStationProps {
   attractions: AttractionItem[];
@@ -293,6 +295,31 @@ export const AttractionsQrStation: React.FC<AttractionsQrStationProps> = ({
                   </a>
                 </div>
               )}
+
+              {/* Operating Hours, Duration & Status Indicator */}
+              <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/80 mt-1.5">
+                <div className="flex items-center gap-2 text-slate-700 font-medium flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>{selectedAttraction.openingTime && selectedAttraction.closingTime ? `${selectedAttraction.openingTime} - ${selectedAttraction.closingTime}` : selectedAttraction.isEmergency ? '24/7' : '08:00 - 17:00'}</span>
+                  </div>
+                  {selectedAttraction.recommendedDuration && (
+                    <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.2 rounded text-[10px]">
+                      ⏱️ {selectedAttraction.recommendedDuration}
+                    </span>
+                  )}
+                </div>
+                {(() => {
+                  const statusInfo = getAttractionStatus(selectedAttraction);
+                  return (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      statusInfo.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {statusInfo.label}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
 
             <div className="pt-1 text-[11px] text-slate-500 italic">

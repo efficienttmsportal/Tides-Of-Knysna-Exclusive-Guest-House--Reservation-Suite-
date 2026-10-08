@@ -2,17 +2,25 @@
 
 @layer base {
   :root {
-    --font-serif: 'Cinzel', Georgia, serif;
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-serif: Arial, Helvetica, sans-serif;
+    --font-sans: Arial, Helvetica, sans-serif;
+  }
+
+  *, *::before, *::after, html, body, h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, select, textarea, table, th, td, header, footer, section, article {
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 }
 
+* {
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
 .font-serif-luxury {
-  font-family: var(--font-serif);
+  font-family: Arial, Helvetica, sans-serif !important;
 }
 
 .font-sans-clean {
-  font-family: var(--font-sans);
+  font-family: Arial, Helvetica, sans-serif !important;
 }
 
 @media print {
@@ -39,12 +47,19 @@
   }
 
   .printable-area,
-  .print-container {
+  .print-container,
+  #guest-printable-document-canvas {
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
     width: 100% !important;
+    display: block !important;
+  }
+
+  #guest-folder-root {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Prevent page breaks inside cards, tables, and signature blocks */
@@ -395,4 +410,70 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-o
 .animate-revenue-row-stagger {
   animation: revenueRowStaggerFadeIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Focus Mode CSS Overrides */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) {
+  color: #2d11f5 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) > strong:nth-of-type(3) {
+  color: #e95e64 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) > strong:nth-of-type(1) {
+  color: #e63007 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) > strong:nth-of-type(2) {
+  color: #0816ea !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #060606 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > h2:nth-of-type(1) {
+  color: #1f09e6 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) {
+  background-color: #070707 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > button#btn-open-print-sheet:nth-of-type(1) {
+  background-color: #09e199 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > button#btn-add-custom-venue:nth-of-type(2) {
+  background-color: #04bf0d !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#qr-concierge-station-hero:nth-of-type(2) {
+  background-color: #cdf4ff !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #c7f88c !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div#attractions-live-qr-station:nth-of-type(3) {
+  background-color: #c8f6c2 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div#attractions-module-root:nth-of-type(2) > div:nth-of-type(4) {
+  background-color: #d3fff2 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > footer:nth-of-type(1) {
+  background-color: #000000 !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(2) {
+  background-color: #d3acff !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #effc05 !important;
+}
+
 

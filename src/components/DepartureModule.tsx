@@ -11,18 +11,23 @@ import {
   AlertTriangle, 
   Check, 
   DollarSign, 
-  Sparkles 
+  Sparkles,
+  FolderOpen
 } from 'lucide-react';
 import { DocumentActionBar } from './DocumentActionBar';
 import { DepartureRecord, Reservation } from '../types';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
 import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
+import { CompanyInfoData } from './CompanyInfoModule';
+import { GuestFolderModule } from './GuestFolderModule';
 
 interface DepartureModuleProps {
   reservations: Reservation[];
+  companyInfo?: CompanyInfoData;
 }
 
-export const DepartureModule: React.FC<DepartureModuleProps> = ({ reservations }) => {
+export const DepartureModule: React.FC<DepartureModuleProps> = ({ reservations, companyInfo }) => {
+  const [activeGuestFolderRes, setActiveGuestFolderRes] = useState<Reservation | null>(null);
   const [departures, setDepartures] = useState<DepartureRecord[]>([
     {
       id: "dep-001",
@@ -170,6 +175,19 @@ export const DepartureModule: React.FC<DepartureModuleProps> = ({ reservations }
               </div>
 
               <div className="flex items-center gap-2 no-print">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const matchedRes = reservations.find(r => r.id === activeDep.reservationId || `${r.customerName} ${r.customerSurname}`.toLowerCase() === activeDep.guestName.toLowerCase()) || reservations[0];
+                    if (matchedRes) setActiveGuestFolderRes(matchedRes);
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-bold bg-slate-900 text-emerald-300 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 shadow-xs border border-slate-700"
+                  title="Open Resident Guest Folder with Final Statement, Invoice & Refund Clearance"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                  Guest Folder & Statement
+                </button>
+
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className="px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg border"
@@ -411,6 +429,20 @@ export const DepartureModule: React.FC<DepartureModuleProps> = ({ reservations }
           </div>
         )}
       </div>
+
+      {/* Resident Guest Folder & Invoicing Dossier Modal */}
+      {activeGuestFolderRes && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto no-print">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-4 sm:p-6 my-6 shadow-2xl relative max-h-[92vh] overflow-y-auto border border-slate-200">
+            <GuestFolderModule 
+              reservation={activeGuestFolderRes}
+              companyInfo={companyInfo}
+              isAdminView={true}
+              onClose={() => setActiveGuestFolderRes(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

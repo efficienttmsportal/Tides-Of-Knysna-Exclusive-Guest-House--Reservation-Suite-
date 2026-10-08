@@ -19,6 +19,7 @@ import {
 import { Reservation } from '../types';
 import { DigitalSignatureBlock, SignatureData } from './DigitalSignatureBlock';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
+import { WhatsAppIcon } from './GuestPortal';
 
 export interface GuestSatisfactionRecord {
   id: string;
@@ -184,6 +185,21 @@ export const GuestSatisfactionSurvey: React.FC<GuestSatisfactionSurveyProps> = (
     setTimeout(() => setEmailStatus(null), 4000);
   };
 
+  const handleWhatsAppSurvey = () => {
+    if (!submittedRecord) return;
+    const msg =
+      `🌟 *GUEST SATISFACTION REVIEW (5-STAR AUDIT)* 🌟\n` +
+      `🏨 *${GUEST_HOUSE_INFO.name}*\n` +
+      `👤 *Resident Guest:* ${submittedRecord.guestName} (Suite ${submittedRecord.roomNumber})\n` +
+      `🔖 *Booking Ref:* ${submittedRecord.reservationNumber}\n` +
+      `⭐ *Overall Score:* ${submittedRecord.overallScore} / 5.0\n` +
+      `✨ *Cleanliness:* ${submittedRecord.cleanlinessScore}/5 | *Amenities:* ${submittedRecord.amenitiesScore}/5 | *Staff:* ${submittedRecord.staffHelpfulnessScore}/5\n` +
+      (submittedRecord.staffMemberMentioned ? `🎖️ *Commended Team Member:* ${submittedRecord.staffMemberMentioned}\n` : '') +
+      `💬 *Guest Comments:* "${submittedRecord.comments}"\n` +
+      `📅 *Date:* ${submittedRecord.timestamp}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  };
+
   const StarRatingRow: React.FC<{
     label: string;
     description: string;
@@ -334,7 +350,15 @@ export const GuestSatisfactionSurvey: React.FC<GuestSatisfactionSurveyProps> = (
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-2 no-print">
+            <div className="flex items-center justify-end gap-3 pt-2 no-print flex-wrap">
+              <button
+                type="button"
+                onClick={handleWhatsAppSurvey}
+                className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                title="Send review highlights directly via WhatsApp"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" /> Share Review via WhatsApp
+              </button>
               <button
                 type="button"
                 onClick={handleEmailSurvey}

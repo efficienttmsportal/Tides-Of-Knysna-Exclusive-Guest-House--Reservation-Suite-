@@ -14,6 +14,7 @@ import {
   QrCode as QrIcon
 } from 'lucide-react';
 import { AttractionItem } from '../types';
+import { WhatsAppIcon } from './GuestPortal';
 
 interface PrintableQrSheetModalProps {
   allAttractions: AttractionItem[];
@@ -113,6 +114,23 @@ export const PrintableQrSheetModal: React.FC<PrintableQrSheetModalProps> = ({
 
   const selectedList = allAttractions.filter(a => selectedIds.includes(a.id));
 
+  // WhatsApp share itinerary
+  const handleWhatsAppShareItinerary = () => {
+    if (selectedList.length === 0) return;
+    const itemsText = selectedList.map((att, i) => 
+      `${i + 1}. *${att.name}* (${att.category})\n   📍 Address: ${att.address} (~${att.distanceFromGuestHouse})\n   📞 Tel: ${att.contactNumber}\n   🗺️ GPS: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${att.name} ${att.address}`)}`
+    ).join('\n\n');
+
+    const msg =
+      `🗺️ *TIDES OF KNYSNA - GUEST DAY-TRIP ITINERARY*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Dear Guest, here is your curated Knysna & Garden Route excursion itinerary:\n\n` +
+      `${itemsText}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Have a safe & wonderful day exploring! Contact Reception anytime at +27 82 555 4321.`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div 
       id="printable-qr-modal-backdrop"
@@ -142,6 +160,14 @@ export const PrintableQrSheetModal: React.FC<PrintableQrSheetModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleWhatsAppShareItinerary}
+              className="bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+              title="Send day-trip itinerary directly to guest via WhatsApp"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5 text-slate-950" />
+              <span>WhatsApp Itinerary</span>
+            </button>
             <button
               id="btn-trigger-print"
               onClick={() => window.print()}
