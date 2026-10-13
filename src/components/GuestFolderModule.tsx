@@ -781,10 +781,10 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
                     {companyInfo?.subTagline || companyInfo?.tagline || 'Exclusive Guest House • 5-Star Boutique Retreat'}
                   </span>
                   <p className="text-xs text-slate-500 mt-1">
-                    {companyInfo?.address || GUEST_HOUSE_INFO.address}
+                    Email: {companyInfo?.email || GUEST_HOUSE_INFO.email} • Web: {companyInfo?.webAddress || GUEST_HOUSE_INFO.webAddress}
                   </p>
                   <p className="text-xs text-slate-500">
-                    Tel: {companyInfo?.telephone || GUEST_HOUSE_INFO.contactNumbers} • Concierge Mobile & WhatsApp: {dutyManagerMobile}
+                    Concierge Mobile & WhatsApp: {dutyManagerMobile} • VAT Reg: 4890281928
                   </p>
                 </div>
               </div>

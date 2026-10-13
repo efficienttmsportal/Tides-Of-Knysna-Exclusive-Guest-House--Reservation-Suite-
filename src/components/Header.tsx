@@ -43,6 +43,8 @@ interface HeaderProps {
   onJumpToInventoryItem?: (item: InventoryItem) => void;
   onJumpToSupplierRating?: (item: InventoryItem | null, supplierName?: string) => void;
   onOpenPrintHub?: () => void;
+  globalCurrency?: string;
+  onCurrencyChange?: (c: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -57,7 +59,9 @@ export const Header: React.FC<HeaderProps> = ({
   inventory,
   onJumpToInventoryItem,
   onJumpToSupplierRating,
-  onOpenPrintHub
+  onOpenPrintHub,
+  globalCurrency = 'ZAR',
+  onCurrencyChange
 }) => {
   const info = companyInfo || (GUEST_HOUSE_INFO as any);
 
@@ -422,6 +426,27 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-200">
+            <span className="text-emerald-400 font-bold hidden sm:inline">Currency:</span>
+            <select
+              value={globalCurrency}
+              onChange={(e) => onCurrencyChange?.(e.target.value)}
+              className="bg-slate-800 text-white text-xs font-bold rounded px-1.5 py-0.5 outline-none border border-slate-700 cursor-pointer"
+            >
+              <option value="ZAR">ZAR (R)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="AUD">AUD (A$)</option>
+              <option value="CAD">CAD (C$)</option>
+              <option value="JPY">JPY (¥)</option>
+              <option value="CHF">CHF (CHF)</option>
+              <option value="NZD">NZD (NZ$)</option>
+              <option value="SGD">SGD (S$)</option>
+              <option value="INR">INR (₹)</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-1 text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">

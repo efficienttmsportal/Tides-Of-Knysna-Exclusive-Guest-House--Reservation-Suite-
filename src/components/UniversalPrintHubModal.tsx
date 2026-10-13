@@ -637,9 +637,8 @@ export const UniversalPrintHubModal: React.FC<UniversalPrintHubModalProps> = ({
                     {info.subTagline || info.tagline || 'EXCLUSIVE GUEST HOUSE • 5-STAR BOUTIQUE RETREAT'}
                   </p>
                   <div className="text-[11px] text-slate-600 mt-1 space-y-0.5">
-                    <div>{info.address || GUEST_HOUSE_INFO.address}</div>
-                    <div>Tel: {info.telephone || info.contactNumbers || GUEST_HOUSE_INFO.telephone} | Email: {info.email || GUEST_HOUSE_INFO.email}</div>
-                    <div>VAT Reg: 4890281928 | Web: {info.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
+                    <div>Email: {info.email || GUEST_HOUSE_INFO.email} | Web: {info.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
+                    <div>VAT Reg: 4890281928</div>
                   </div>
                 </div>
               </div>

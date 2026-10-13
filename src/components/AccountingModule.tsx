@@ -582,9 +582,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
                       "{companyInfo?.subTagline || companyInfo?.tagline || GUEST_HOUSE_INFO.tagline}"
                     </p>
                     <div className="text-[11px] text-slate-600 mt-1 space-y-0.5">
-                      <div>{companyInfo?.address || GUEST_HOUSE_INFO.address}</div>
-                      <div>Tel: {companyInfo?.telephone || GUEST_HOUSE_INFO.contactNumbers} | VAT Reg: 4890281928</div>
                       <div>Email: {companyInfo?.email || GUEST_HOUSE_INFO.email} | Web: {companyInfo?.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
+                      <div>VAT Reg: 4890281928</div>
                     </div>
                   </div>
                 </div>

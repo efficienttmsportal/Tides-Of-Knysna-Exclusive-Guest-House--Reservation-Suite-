@@ -92,7 +92,8 @@ import {
   Edit3,
   ClipboardCheck,
   Scale,
-  Printer
+  Printer,
+  RotateCcw
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -1154,7 +1155,8 @@ export const App: React.FC = () => {
       return true;
     })();
 
-    return matchesQuery && matchesCategory && matchesStatus && matchesExpiry;
+    const matchesCritical = !inventoryCriticalStatusOnly || (item.howManyOnHand <= item.whenToReorder);
+    return matchesQuery && matchesCategory && matchesStatus && matchesExpiry && matchesCritical;
   });
 
   // Export to CSV helper
@@ -1266,6 +1268,78 @@ export const App: React.FC = () => {
       actionType: nextLocked ? 'Item Locked for Audit' : 'Item Unlocked',
       notes: nextLocked ? 'Item locked for scheduled audit / inventory count freeze' : 'Item unlocked for regular operations'
     });
+  };
+
+  // Global Currency State
+  const [globalCurrency, setGlobalCurrency] = useState<string>('ZAR');
+  const currencySymbols: Record<string, string> = {
+    ZAR: 'R',
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    AUD: 'A$',
+    CAD: 'C$',
+    JPY: '¥',
+    CHF: 'CHF',
+    NZD: 'NZ$',
+    SGD: 'S$',
+    INR: '₹'
+  };
+  const currencyRates: Record<string, number> = {
+    ZAR: 1,
+    USD: 0.054,
+    EUR: 0.050,
+    GBP: 0.043,
+    AUD: 0.083,
+    CAD: 0.075,
+    JPY: 8.1,
+    CHF: 0.048,
+    NZD: 0.090,
+    SGD: 0.073,
+    INR: 4.5
+  };
+  const formatCurrency = (amountInZar: number) => {
+    const rate = currencyRates[globalCurrency] || 1;
+    const symbol = currencySymbols[globalCurrency] || 'R';
+    const converted = amountInZar * rate;
+    return `${symbol} ${converted.toLocaleString('en-US', { minimumFractionDigits: globalCurrency === 'JPY' ? 0 : 2, maximumFractionDigits: globalCurrency === 'JPY' ? 0 : 2 })}`;
+  };
+
+  // Critical Status Toggle State
+  const [inventoryCriticalStatusOnly, setInventoryCriticalStatusOnly] = useState<boolean>(false);
+
+  // Batch Undo Handler
+  const handleBatchUndo = () => {
+    if (selectedItemIds.length === 0) return;
+    const count = selectedItemIds.length;
+    let revertedCount = 0;
+
+    const updated = inventory.map(item => {
+      if (selectedItemIds.includes(item.id)) {
+        const lastLog = stockAuditLog.find(log => log.itemId === item.id);
+        if (lastLog) {
+          revertedCount++;
+          const prevQty = lastLog.previousQty;
+          appendAuditLog({
+            itemId: item.id,
+            itemCode: item.itemCode,
+            itemDescription: item.itemDescription,
+            previousQty: item.howManyOnHand,
+            newQty: prevQty,
+            deltaQty: prevQty - item.howManyOnHand,
+            adjustedBy: currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Duty Operations Officer',
+            actionType: 'Batch Undo Adjustment',
+            notes: `Reverted last adjustment (undoing delta ${lastLog.deltaQty})`
+          });
+          return { ...item, howManyOnHand: prevQty };
+        }
+      }
+      return item;
+    });
+
+    setInventory(updated);
+    setBatchNotice(`Batch Undo: Reverted last adjustment for ${revertedCount} selected items.`);
+    setTimeout(() => setBatchNotice(null), 4000);
   };
 
   // Bulk Selection & Batch Actions State
@@ -1680,6 +1754,8 @@ export const App: React.FC = () => {
         onJumpToInventoryItem={handleJumpToInventoryItem}
         onJumpToSupplierRating={handleJumpToSupplierRating}
         onOpenPrintHub={() => handleOpenPrintHub()}
+        globalCurrency={globalCurrency}
+        onCurrencyChange={setGlobalCurrency}
       />
 
       {/* Main Content Viewport */}
@@ -1782,6 +1858,8 @@ export const App: React.FC = () => {
             reservations={reservations}
             onUpdateReservations={setReservations}
             companyInfo={companyInfo}
+            globalCurrency={globalCurrency}
+            formatCurrency={formatCurrency}
           />
         )}
 
@@ -1803,6 +1881,8 @@ export const App: React.FC = () => {
           <AccountingModule 
             reservations={reservations} 
             companyInfo={companyInfo}
+            globalCurrency={globalCurrency}
+            formatCurrency={formatCurrency}
           />
         )}
 
@@ -2110,6 +2190,18 @@ export const App: React.FC = () => {
                       <CheckCircle className="w-3 h-3 text-emerald-600" />
                       Adequate ({inventory.length - lowStockCount})
                     </button>
+                    <button
+                      onClick={() => setInventoryCriticalStatusOnly(prev => !prev)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
+                        inventoryCriticalStatusOnly
+                          ? 'bg-rose-700 text-white shadow-md animate-pulse'
+                          : 'bg-rose-50 text-rose-900 hover:bg-rose-100 border border-rose-300'
+                      }`}
+                      title="Toggle Critical Status (Items below reorder threshold with breathing red glow animation)"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                      Critical Status ({inventory.filter(i => i.howManyOnHand <= i.whenToReorder).length})
+                    </button>
                   </div>
                 </div>
 
@@ -2303,6 +2395,16 @@ export const App: React.FC = () => {
                     >
                       <History className="w-3.5 h-3.5 text-indigo-200" />
                       Batch Audit Report
+                    </button>
+
+                    {/* Batch Undo */}
+                    <button
+                      onClick={handleBatchUndo}
+                      className="px-3.5 py-1.5 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-md transition border border-rose-500/40"
+                      title="Revert the most recent inventory adjustment (delta) for all currently selected items"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-rose-200" />
+                      Batch Undo ({selectedItemIds.length})
                     </button>
 
                     {/* Batch Lock / Unlock */}
