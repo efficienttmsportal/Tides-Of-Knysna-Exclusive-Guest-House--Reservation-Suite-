@@ -1125,7 +1125,8 @@ export const App: React.FC = () => {
       item.category.toLowerCase().includes(query);
 
     const matchesCategory = inventoryCategoryFilter === 'All' || item.category === inventoryCategoryFilter;
-    const isLow = item.howManyOnHand <= item.whenToReorder;
+    const effectiveReorderThreshold = item.emergencyStockLevel !== undefined ? item.emergencyStockLevel : item.whenToReorder;
+    const isLow = item.howManyOnHand <= effectiveReorderThreshold;
     const matchesStatus = inventoryStockStatusFilter === 'All' 
       ? true 
       : inventoryStockStatusFilter === 'LowStock' 
@@ -1155,15 +1156,16 @@ export const App: React.FC = () => {
       return true;
     })();
 
-    const matchesCritical = !inventoryCriticalStatusOnly || (item.howManyOnHand <= item.whenToReorder);
+    const matchesCritical = !inventoryCriticalStatusOnly || (item.howManyOnHand <= effectiveReorderThreshold);
     return matchesQuery && matchesCategory && matchesStatus && matchesExpiry && matchesCritical;
   });
 
   // Export to CSV helper
   const handleExportInventoryCsv = () => {
-    const headers = ['Item Code', 'Description', 'Category', 'Unit Price (ZAR)', 'On Hand', 'Unit', 'Reorder Level', 'Stock Status', 'Expiry Date', 'Predicted Order Date', 'Supplier', 'Last Restocked', 'Notes / Notas'];
+    const headers = ['Item Code', 'Description', 'Category', 'Unit Price (ZAR)', 'On Hand', 'Unit', 'Reorder Level', 'Emergency Level', 'Stock Status', 'Expiry Date', 'Predicted Order Date', 'Supplier', 'Last Restocked', 'Notes / Notas'];
     const rows = filteredInventory.map(item => {
-      const isLow = item.howManyOnHand <= item.whenToReorder;
+      const effectiveThresh = item.emergencyStockLevel !== undefined ? item.emergencyStockLevel : item.whenToReorder;
+      const isLow = item.howManyOnHand <= effectiveThresh;
       const orderAnalysis = calculateOrderDate(item);
       const notesValue = [item.notes, item.notas ? `[ES: ${item.notas}]` : ''].filter(Boolean).join(' | ');
       return [
@@ -1348,6 +1350,51 @@ export const App: React.FC = () => {
   const [qrModalInitialMode, setQrModalInitialMode] = useState<'single' | 'sheet' | 'scanner'>('single');
   const [isSynchronizedAuditModalOpen, setIsSynchronizedAuditModalOpen] = useState(false);
   const [quickContactSupplier, setQuickContactSupplier] = useState<{ name: string; item?: InventoryItem } | null>(null);
+
+  // Threshold & Price Adjustment Modal State
+  const [thresholdModalItem, setThresholdModalItem] = useState<InventoryItem | null>(null);
+  const [thresholdModalPrice, setThresholdModalPrice] = useState<number>(0);
+  const [thresholdModalThreshold, setThresholdModalThreshold] = useState<number>(0);
+  const [thresholdModalEmergencyLevel, setThresholdModalEmergencyLevel] = useState<number>(0);
+
+  const handleOpenThresholdModal = (item: InventoryItem) => {
+    setThresholdModalItem(item);
+    setThresholdModalPrice(item.pricePerUnit);
+    setThresholdModalThreshold(item.whenToReorder);
+    setThresholdModalEmergencyLevel(item.emergencyStockLevel !== undefined ? item.emergencyStockLevel : item.whenToReorder);
+  };
+
+  const handleSaveThresholdModal = () => {
+    if (!thresholdModalItem) return;
+    const updatedInventory = inventory.map(item => {
+      if (item.id === thresholdModalItem.id) {
+        appendAuditLog({
+          itemId: item.id,
+          itemCode: item.itemCode,
+          itemDescription: item.itemDescription,
+          previousQty: item.howManyOnHand,
+          newQty: item.howManyOnHand,
+          deltaQty: 0,
+          adjustedBy: currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Head of Operations',
+          actionType: 'Threshold & Price Adjustment',
+          notes: `Updated unit price (${item.pricePerUnit} -> ${thresholdModalPrice}), standard threshold (${item.whenToReorder} -> ${thresholdModalThreshold}), emergency level (${item.emergencyStockLevel ?? 'None'} -> ${thresholdModalEmergencyLevel})`
+        });
+        return {
+          ...item,
+          pricePerUnit: Math.max(0.01, Number(thresholdModalPrice)),
+          whenToReorder: Math.max(1, Number(thresholdModalThreshold)),
+          emergencyStockLevel: Number(thresholdModalEmergencyLevel) > 0 ? Number(thresholdModalEmergencyLevel) : undefined
+        };
+      }
+      return item;
+    });
+
+    setInventory(updatedInventory);
+    setThresholdModalItem(null);
+    setBatchNotice(`Successfully updated thresholds and pricing for "${thresholdModalItem.itemDescription}".`);
+    setTimeout(() => setBatchNotice(null), 4000);
+  };
+
   const [batchNotice, setBatchNotice] = useState<string | null>(null);
   const [activeBatchModal, setActiveBatchModal] = useState<'category' | 'supplier' | 'reorder' | 'price' | 'location' | null>(null);
   const [batchLocationInput, setBatchLocationInput] = useState<string>('Main Storeroom Alpha');
@@ -2692,7 +2739,22 @@ export const App: React.FC = () => {
                                 {item.location || 'Main Store'}
                               </span>
                             </td>
-                            <td className="px-3 py-2 font-bold text-slate-800">R {item.pricePerUnit}</td>
+                            <td 
+                              className="px-3 py-2 font-bold text-slate-800 cursor-pointer hover:text-emerald-700 hover:underline transition group"
+                              onClick={() => handleOpenThresholdModal(item)}
+                              title="Click to configure Unit Price & Custom Emergency Stock Level override"
+                            >
+                              <div>{formatCurrency(item.pricePerUnit)}</div>
+                              {item.emergencyStockLevel !== undefined ? (
+                                <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+                                  Emergency: {item.emergencyStockLevel}
+                                </span>
+                              ) : (
+                                <span className="text-[9.5px] text-slate-400 group-hover:text-emerald-600 font-normal">
+                                  Configure Limit
+                                </span>
+                              )}
+                            </td>
                             <td className="px-3 py-2 font-bold text-slate-900">{item.howManyOnHand} {item.unit}</td>
                             <td className="px-3 py-2 text-slate-500">{item.whenToReorder} {item.unit}</td>
 
@@ -4343,6 +4405,96 @@ export const App: React.FC = () => {
         initialDocumentId={printHubDocumentId}
         isAdminView={currentUser?.role === 'admin'}
       />
+
+      {/* THRESHOLD & PRICE ADJUSTMENT MODAL */}
+      {thresholdModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-serif-luxury font-bold text-slate-900 text-lg">
+                  Threshold & Pricing Adjustment
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {thresholdModalItem.itemCode} • {thresholdModalItem.itemDescription}
+                </p>
+              </div>
+              <button
+                onClick={() => setThresholdModalItem(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  Seasonal / High-Demand Override Configuration
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Define a custom <strong>Emergency Stock Level</strong> to override the standard reorder threshold for high-demand seasonal items and ensure early replenishment triggers.
+                </p>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Unit Price ({globalCurrency})</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={thresholdModalPrice}
+                  onChange={(e) => setThresholdModalPrice(Number(e.target.value))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Standard Reorder Threshold (Units)</label>
+                <input
+                  type="number"
+                  value={thresholdModalThreshold}
+                  onChange={(e) => setThresholdModalThreshold(Number(e.target.value))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-rose-700 block mb-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  Custom Emergency Stock Level (Overrides Standard Threshold)
+                </label>
+                <input
+                  type="number"
+                  value={thresholdModalEmergencyLevel}
+                  onChange={(e) => setThresholdModalEmergencyLevel(Number(e.target.value))}
+                  placeholder="e.g. 15 units"
+                  className="w-full text-xs p-2.5 rounded-xl border border-rose-300 focus:ring-2 focus:ring-rose-500 outline-none font-bold text-rose-900 bg-rose-50/50"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  When stock falls at or below this emergency level, critical status breathing glow and reorder priority are instantly triggered.
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                onClick={() => setThresholdModalItem(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveThresholdModal}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Save Threshold & Pricing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Footer */}
       <Footer 

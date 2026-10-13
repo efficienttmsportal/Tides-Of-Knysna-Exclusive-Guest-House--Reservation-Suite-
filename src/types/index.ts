@@ -102,6 +102,7 @@ export interface InventoryItem {
   pricePerUnit: number;
   howManyUsed: number;
   whenToReorder: number; // Threshold
+  emergencyStockLevel?: number; // Custom emergency stock level override
   howManyOnHand: number;
   unit: string;
   supplier: string;
