@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
 import { 
   KeyRound, 
   BedDouble, 
@@ -56,6 +57,7 @@ import { DigitalRoomAccess } from './DigitalRoomAccess';
 import { DigitalSignatureBlock } from './DigitalSignatureBlock';
 import { GuestSatisfactionSurvey } from './GuestSatisfactionSurvey';
 import { GuestFolderModule, UploadedPolicyDocument } from './GuestFolderModule';
+import { UniversalPrintHubModal } from './UniversalPrintHubModal';
 
 export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -208,6 +210,20 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
   const [guestPolicyCategory, setGuestPolicyCategory] = useState('Guest Signed Agreement');
   const [isGuestUploadingPolicy, setIsGuestUploadingPolicy] = useState(false);
 
+  // Universal Document & Print Hub inside Portal
+  const [isPrintHubOpen, setIsPrintHubOpen] = useState(false);
+  const [printHubCategory, setPrintHubCategory] = useState<'dossier' | 'accounting' | 'policies' | 'staypass' | 'checkin' | 'departure'>('staypass');
+  const [printHubPolicyDoc, setPrintHubPolicyDoc] = useState<UploadedPolicyDocument | null>(null);
+
+  const handleOpenPortalPrint = (
+    category: 'dossier' | 'accounting' | 'policies' | 'staypass' | 'checkin' | 'departure',
+    policyDoc?: UploadedPolicyDocument | null
+  ) => {
+    setPrintHubCategory(category);
+    setPrintHubPolicyDoc(policyDoc || null);
+    setIsPrintHubOpen(true);
+  };
+
   // Estate Policies State (Loaded & Editable by Admin)
   const [policies, setPolicies] = useState<EstatePolicyItem[]>(() => {
     try {
@@ -355,6 +371,38 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
   const currentReservation = useMemo(() => {
     return reservations.find(r => r.id === activeReservationId) || null;
   }, [reservations, activeReservationId]);
+
+  // WhatsApp Notifications enabled state
+  const [isWhatsAppNotificationsEnabled, setIsWhatsAppNotificationsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('tok_whatsapp_notifications') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+  const [whatsappNotificationToast, setWhatsappNotificationToast] = useState<string | null>(null);
+
+  // Dynamic Stay Attractions QR Code
+  const [stayAttractionsQrUrl, setStayAttractionsQrUrl] = useState<string>('');
+  const [isStayQrModalOpen, setIsStayQrModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentReservation) {
+      const attractionsUrl = `https://tidesofknysna.co.za/portal?ref=${encodeURIComponent(currentReservation.reservationNumber)}&view=attractions&suite=${currentReservation.roomNumber}&guest=${encodeURIComponent(currentReservation.customerName)}`;
+      QRCode.toDataURL(attractionsUrl, {
+        width: 320,
+        margin: 2,
+        color: {
+          dark: '#064e3b',
+          light: '#ffffff'
+        }
+      }).then(url => {
+        setStayAttractionsQrUrl(url);
+      }).catch(err => {
+        console.error('Failed to generate stay attractions QR', err);
+      });
+    }
+  }, [currentReservation]);
 
   // Handle Login
   const handleLogin = (e: React.FormEvent) => {
@@ -780,12 +828,21 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
             </button>
 
             <button
-              onClick={() => window.print()}
+              onClick={() => handleOpenPortalPrint('staypass')}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition shadow-xs"
               title="Print Stay Pass & Key Dossier (Laser, Inkjet, Adobe PDF & Universal Print Drivers)"
             >
               <Printer className="w-3.5 h-3.5 text-emerald-400" />
               Print Pass
+            </button>
+
+            <button
+              onClick={() => handleOpenPortalPrint('dossier')}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition shadow-xs"
+              title="Open Universal Document Print Hub with all 14 Dossier docs, Invoices, and Policies"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              Print Hub
             </button>
 
             <button
@@ -831,6 +888,15 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
             </button>
 
             <button
+              onClick={() => setIsStayQrModalOpen(true)}
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-md"
+              title="Generate & view unique QR code linking to customized local attractions for this stay"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              Attractions QR Pass
+            </button>
+
+            <button
               onClick={handleLogout}
               className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-rose-800/50 transition"
             >
@@ -838,6 +904,36 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
               Sign Out
             </button>
           </div>
+        </div>
+
+        {/* WhatsApp Notifications Status Bar */}
+        <div className="relative z-10 mt-6 bg-gradient-to-r from-slate-900 via-emerald-950/80 to-slate-900 px-4 py-3 rounded-2xl border border-emerald-500/30 text-xs text-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-sm no-print">
+          <div className="flex items-center gap-2.5">
+            <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+            <span>
+              <strong>WhatsApp Notifications:</strong> {isWhatsAppNotificationsEnabled ? 'Active (Instant Dispatch via +27 82 555 4321)' : 'Paused'}
+            </span>
+            {whatsappNotificationToast && (
+              <span className="text-emerald-300 font-bold ml-2 animate-fade-in">({whatsappNotificationToast})</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isWhatsAppNotificationsEnabled;
+              setIsWhatsAppNotificationsEnabled(next);
+              try {
+                localStorage.setItem('tok_whatsapp_notifications', String(next));
+              } catch(e) {}
+              setWhatsappNotificationToast(next ? 'Enabled ✓' : 'Paused');
+              setTimeout(() => setWhatsappNotificationToast(null), 3000);
+            }}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
+              isWhatsAppNotificationsEnabled ? 'bg-[#25D366] text-slate-950 hover:bg-[#20bd5a]' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {isWhatsAppNotificationsEnabled ? 'Disable Notifications' : 'Enable WhatsApp Notifications'}
+          </button>
         </div>
 
         {/* ESSENTIAL RESIDENT STAY CREDENTIALS & SIGHTSEEING QUICK BAR */}
@@ -1905,12 +2001,12 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
 
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => handleOpenPortalPrint('policies')}
                   className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
                   title="Print House Rules for hard copy filing on any printer"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  Print Policies (Laser/Inkjet)
+                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                  Print Policies (All Printers)
                 </button>
 
                 <button
@@ -2808,6 +2904,81 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
           </span>
         </button>
       </div>
+
+      {/* STAY ATTRACTIONS QR PASS MODAL */}
+      {isStayQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in no-print">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400">
+                  <QrCode className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="font-serif-luxury font-bold text-base">Suite {currentReservation.roomNumber} Attractions QR Pass</h3>
+                  <p className="text-[10px] text-emerald-300">Customized Local Attractions & Guide for {currentReservation.customerName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsStayQrModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-full transition text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 text-center space-y-4">
+              <p className="text-xs text-slate-600">
+                Scan this unique QR code with any smartphone camera to instantly access your customized Tides of Knysna local attractions directory, wine estates, and lagoon tours.
+              </p>
+
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block shadow-inner mx-auto">
+                {stayAttractionsQrUrl ? (
+                  <img src={stayAttractionsQrUrl} alt="Stay Attractions QR Code" className="w-48 h-48 mx-auto rounded-xl" />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-slate-400 text-xs">Generating QR...</div>
+                )}
+              </div>
+
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-800 text-xs text-left space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Linked Stay Profile:</span>
+                </div>
+                <div className="text-[11px] text-slate-700">
+                  Ref: <strong>{currentReservation.reservationNumber}</strong> • Suite {currentReservation.roomNumber} ({currentReservation.customerName} {currentReservation.customerSurname})
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePortalTab('recommendations');
+                    setIsStayQrModalOpen(false);
+                  }}
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4" />
+                  Open Local Attractions View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = `🌴 *Tides of Knysna Attractions Pass - Suite ${currentReservation.roomNumber}*\nGuest: ${currentReservation.customerName} ${currentReservation.customerSurname} (Ref: ${currentReservation.reservationNumber})\nExplore curated Garden Route attractions & book via concierge!`;
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="px-3.5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 transition shadow-sm"
+                  title="Share Attractions Pass via WhatsApp"
+                >
+                  <WhatsAppIcon className="w-4 h-4 text-slate-950" />
+                  WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

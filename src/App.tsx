@@ -27,8 +27,10 @@ import { StockAuditLogModal } from './components/StockAuditLogModal';
 import { InventoryForecastingModule } from './components/InventoryForecastingModule';
 import { PriorityTrendDashboardModal } from './components/PriorityTrendDashboardModal';
 import { SynchronizedAuditCountModal } from './components/SynchronizedAuditCountModal';
+import { UniversalPrintHubModal } from './components/UniversalPrintHubModal';
 import { calculateOrderDate } from './utils/predictiveOrderCalculator';
 import jsPDF from 'jspdf';
+import { addPdfWatermarkAndEmblem } from './utils/pdfWatermarkUtils';
 import { 
   UserAccount, 
   Reservation, 
@@ -89,7 +91,8 @@ import {
   Calendar,
   Edit3,
   ClipboardCheck,
-  Scale
+  Scale,
+  Printer
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -506,6 +509,65 @@ export const App: React.FC = () => {
   const [adjustmentNoteInput, setAdjustmentNoteInput] = useState('');
   const [isRowHeightened, setIsRowHeightened] = useState(false);
 
+  // Target states for jumping from Header reorder notification dropdown
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  const [targetSupplierForPerformance, setTargetSupplierForPerformance] = useState<string | null>(null);
+  const [targetItemForPerformance, setTargetItemForPerformance] = useState<InventoryItem | null>(null);
+
+  const handleJumpToInventoryItem = (item: InventoryItem) => {
+    setActiveTab('inventory');
+    setInventorySubTab('matrix');
+    setInventoryCategoryFilter('All');
+    setInventoryStockStatusFilter('All');
+    setInventoryExpiryFilter('All');
+    setInventorySearchQuery(item.itemCode || item.itemDescription);
+    setHighlightedItemId(item.id);
+
+    // Scroll to targeted row smoothly
+    setTimeout(() => {
+      const el = document.getElementById(`inventory-row-${item.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 250);
+
+    // Clear highlight after 5 seconds
+    setTimeout(() => {
+      setHighlightedItemId(prev => (prev === item.id ? null : prev));
+    }, 5000);
+  };
+
+  const handleJumpToSupplierRating = (item?: InventoryItem | null, supplierName?: string) => {
+    const sup = supplierName || item?.supplier || null;
+    setTargetSupplierForPerformance(sup);
+    setTargetItemForPerformance(item || null);
+    setActiveTab('inventory');
+    setInventorySubTab('supplier_performance');
+
+    setTimeout(() => {
+      if (sup) {
+        const supEl = document.getElementById(`supplier-card-${encodeURIComponent(sup)}`);
+        if (supEl) {
+          supEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }, 250);
+  };
+
+  // Universal Document & Print Hub State
+  const [isPrintHubOpen, setIsPrintHubOpen] = useState(false);
+  const [printHubCategory, setPrintHubCategory] = useState<'dossier' | 'accounting' | 'policies' | 'staypass' | 'checkin' | 'departure'>('dossier');
+  const [printHubDocumentId, setPrintHubDocumentId] = useState<string | undefined>(undefined);
+
+  const handleOpenPrintHub = (
+    category?: 'dossier' | 'accounting' | 'policies' | 'staypass' | 'checkin' | 'departure',
+    docId?: string
+  ) => {
+    if (category) setPrintHubCategory(category);
+    if (docId) setPrintHubDocumentId(docId);
+    setIsPrintHubOpen(true);
+  };
+
   const handleMoveLocation = (item: InventoryItem, targetLocation: string) => {
     if (!targetLocation.trim()) return;
     const prevLocation = item.location || 'Main Store';
@@ -858,6 +920,7 @@ export const App: React.FC = () => {
       doc.setTextColor(148, 163, 184);
       doc.text('Tides of Knysna Exclusive Guest House | Confidential Inventory Document | Page 1 of 1', 35, 810);
 
+      addPdfWatermarkAndEmblem(doc);
       doc.save(`${item.itemCode}_Priority_Trend_Report.pdf`);
     } catch (error) {
       console.error('Failed to generate Priority Trend PDF', error);
@@ -1397,6 +1460,26 @@ export const App: React.FC = () => {
     setTimeout(() => setBatchNotice(null), 4000);
   };
 
+  const handleBatchSafetyBufferRestock = () => {
+    if (selectedItemIds.length === 0) return;
+    const count = selectedItemIds.length;
+    setInventory(prev => prev.map(item => {
+      if (selectedItemIds.includes(item.id)) {
+        const threshold = item.reorderThreshold ?? 5;
+        const diff = Math.max(0, threshold - item.howManyOnHand);
+        const addAmount = diff > 0 ? diff : 10;
+        return {
+          ...item,
+          howManyOnHand: item.howManyOnHand + addAmount,
+          lastRestocked: new Date().toISOString().split('T')[0]
+        };
+      }
+      return item;
+    }));
+    setBatchNotice(`Applied Safety Buffer Restock (threshold diff + buffer) across ${count} selected items.`);
+    setTimeout(() => setBatchNotice(null), 4000);
+  };
+
   const handleBatchDelete = () => {
     if (selectedItemIds.length === 0) return;
     if (!confirm(`Are you sure you want to remove ${selectedItemIds.length} selected items from inventory?`)) return;
@@ -1593,6 +1676,10 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         companyInfo={companyInfo}
         lowStockCount={lowStockCount}
+        inventory={inventory}
+        onJumpToInventoryItem={handleJumpToInventoryItem}
+        onJumpToSupplierRating={handleJumpToSupplierRating}
+        onOpenPrintHub={() => handleOpenPrintHub()}
       />
 
       {/* Main Content Viewport */}
@@ -1624,7 +1711,15 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => handleOpenPrintHub()}
+              className="inline-flex items-center gap-1.5 text-slate-800 font-bold bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-300 shadow-xs text-xs transition"
+              title="Open Universal Document Print & Export Hub (Inkjet, Laserjet, Inktank)"
+            >
+              <Printer className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Print Hub & Documents</span>
+            </button>
             {lowStockCount > 0 && (
               <button
                 onClick={() => setActiveTab('inventory')}
@@ -1705,7 +1800,10 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'accounting' && (
-          <AccountingModule reservations={reservations} />
+          <AccountingModule 
+            reservations={reservations} 
+            companyInfo={companyInfo}
+          />
         )}
 
         {activeTab === 'marketing' && (
@@ -1796,6 +1894,13 @@ export const App: React.FC = () => {
                 inventory={inventory}
                 onOpenSupplierModal={(sup) => setQuickContactSupplier({ name: sup })}
                 onGenerateDraftPo={() => setIsDraftPoModalOpen(true)}
+                targetSupplier={targetSupplierForPerformance}
+                targetItem={targetItemForPerformance}
+                onClearTargetSupplier={() => {
+                  setTargetSupplierForPerformance(null);
+                  setTargetItemForPerformance(null);
+                }}
+                onJumpToMatrix={handleJumpToInventoryItem}
               />
             )}
 
@@ -2283,6 +2388,16 @@ export const App: React.FC = () => {
                       +10 to All
                     </button>
 
+                    {/* Safety Buffer Restock */}
+                    <button
+                      onClick={handleBatchSafetyBufferRestock}
+                      className="px-3 py-1.5 bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 rounded-xl font-bold flex items-center gap-1.5 border border-sky-700/60 transition"
+                      title="Quickly apply Safety Buffer Restock: automatically adding the difference between current stock and individual reorder threshold"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                      Safety Buffer Restock
+                    </button>
+
                     {/* Batch QR Generator */}
                     <button
                       onClick={handleOpenBatchQrModal}
@@ -2407,10 +2522,17 @@ export const App: React.FC = () => {
                                                priority === 'Medium' ? 'bg-amber-50/30 hover:bg-amber-50/50 border-l-4 border-l-amber-400' :
                                                'hover:bg-slate-50 border-l-4 border-l-slate-300';
 
+                        const isRowHighlighted = highlightedItemId === item.id;
+
                         return (
                           <React.Fragment key={item.id}>
                             <tr 
-                              className={`transition-all duration-300 ${pulsingClass || priorityBgClass} ${isRowHeightened ? 'h-16' : ''}`}
+                              id={`inventory-row-${item.id}`}
+                              className={`transition-all duration-300 ${
+                                isRowHighlighted 
+                                  ? 'ring-4 ring-amber-400 bg-amber-100/90 shadow-xl scale-[1.008] z-20 relative'
+                                  : (pulsingClass || priorityBgClass)
+                              } ${isRowHeightened ? 'h-16' : ''}`}
                             >
                             <td className="px-3 py-2 text-center">
                               <input
@@ -2435,7 +2557,16 @@ export const App: React.FC = () => {
                                 <span>{item.itemCode}</span>
                               </div>
                             </td>
-                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemDescription}</td>
+                            <td className="px-3 py-2 font-semibold text-slate-900">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{item.itemDescription}</span>
+                                {isRowHighlighted && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-400 text-slate-950 border border-amber-500 shadow-xs animate-bounce inline-flex items-center gap-1">
+                                    ★ Reorder Alert Focus
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-3 py-2">
                               <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 whitespace-nowrap">
                                 {item.category}
@@ -4098,6 +4229,17 @@ export const App: React.FC = () => {
           setCurrentUser(user);
           setIsAuthOpen(false);
         }}
+      />
+
+      {/* Universal Document Print & Export Hub Modal */}
+      <UniversalPrintHubModal
+        isOpen={isPrintHubOpen}
+        onClose={() => setIsPrintHubOpen(false)}
+        companyInfo={companyInfo}
+        reservations={reservations}
+        initialCategory={printHubCategory}
+        initialDocumentId={printHubDocumentId}
+        isAdminView={currentUser?.role === 'admin'}
       />
 
       {/* Global Footer */}

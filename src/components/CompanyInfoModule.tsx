@@ -26,6 +26,7 @@ import {
 import { GUEST_HOUSE_INFO } from '../data/initialData';
 import { UploadedPolicyDocument } from './GuestFolderModule';
 import { WhatsAppIcon } from './GuestPortal';
+import { UniversalPrintHubModal } from './UniversalPrintHubModal';
 
 export interface CompanyInfoData {
   name: string;
@@ -220,8 +221,12 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
     setTimeout(() => setPolicyNotice(null), 3000);
   };
 
-  const handlePrintPolicy = () => {
-    window.print();
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [activePrintPolicyDoc, setActivePrintPolicyDoc] = useState<UploadedPolicyDocument | null>(null);
+
+  const handlePrintPolicy = (policy?: UploadedPolicyDocument) => {
+    setActivePrintPolicyDoc(policy || uploadedPolicies[0] || null);
+    setIsPrintModalOpen(true);
   };
 
   const handleFileUpload = (field: keyof CompanyInfoData, file: File) => {
@@ -1234,9 +1239,9 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
 
                           <button
                             type="button"
-                            onClick={handlePrintPolicy}
+                            onClick={() => handlePrintPolicy(pol)}
                             className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-xl font-bold flex items-center gap-1.5 transition text-xs"
-                            title="Print policy documentation on any printer"
+                            title="Print policy on all universal printers (Inkjet, Laserjet, Inktank)"
                           >
                             <Printer className="w-3.5 h-3.5 text-emerald-700" />
                             Print
@@ -1288,6 +1293,16 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
           </button>
         </div>
       </form>
+
+      {/* Universal Document & Policy Print Hub Modal */}
+      <UniversalPrintHubModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        companyInfo={formData}
+        initialCategory="policies"
+        initialUploadedDoc={activePrintPolicyDoc}
+        isAdminView={true}
+      />
     </div>
   );
 };

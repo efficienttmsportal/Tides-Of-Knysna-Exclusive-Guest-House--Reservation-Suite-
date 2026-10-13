@@ -22,12 +22,16 @@ import { DocumentActionBar } from './DocumentActionBar';
 import { AccountingDocument, Reservation } from '../types';
 import { INITIAL_ACCOUNTING_DOCS, GUEST_HOUSE_INFO } from '../data/initialData';
 import { FiscalAnalyticsChart } from './FiscalAnalyticsChart';
+import { CompanyInfoData } from './CompanyInfoModule';
+import jsPDF from 'jspdf';
+import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 
 export interface AccountingModuleProps {
   reservations?: Reservation[];
+  companyInfo?: CompanyInfoData;
 }
 
-export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations = [] }) => {
+export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations = [], companyInfo }) => {
   const [documents, setDocuments] = useState<AccountingDocument[]>(INITIAL_ACCOUNTING_DOCS);
   const [activeDocType, setActiveDocType] = useState<string>('All');
   const [selectedDocId, setSelectedDocId] = useState<string>(documents[0]?.id || '');
@@ -151,6 +155,193 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
     setFormData(prev => ({ ...prev, items: updatedItems }));
   };
 
+  // Universal Hardware Print - Compatible with Inkjet, Laserjet, Inktank printers on Universal Printer Drivers
+  const handlePrint = () => {
+    window.print();
+  };
+
+  // Official Adobe PDF Generator for Corporate Financial Documentation
+  // Strictly refrains from including any Wi-Fi password or username (0 mentions of Wi-Fi credentials)
+  const handleDownloadPdf = () => {
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const companyTitle = companyInfo?.name || GUEST_HOUSE_INFO.name;
+      const companySub = companyInfo?.subTagline || companyInfo?.tagline || 'EXCLUSIVE GUEST HOUSE • 5-STAR BOUTIQUE RETREAT';
+      const companyAddr = companyInfo?.address || GUEST_HOUSE_INFO.address;
+      const companyTel = companyInfo?.telephone || GUEST_HOUSE_INFO.contactNumbers;
+      const companyEmail = companyInfo?.email || GUEST_HOUSE_INFO.email;
+      const bank = companyInfo?.bankDetails || GUEST_HOUSE_INFO.bankDetails;
+
+      // Corporate Stationery Branding Header
+      pdf.setFillColor(15, 23, 42); // slate-900
+      pdf.rect(0, 0, 210, 30, 'F');
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.text(companyTitle.toUpperCase(), 15, 12);
+
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(209, 250, 229); // emerald-100
+      pdf.text(companySub, 15, 18);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(226, 232, 240);
+      pdf.text(`${companyAddr} | Tel: ${companyTel} | Email: ${companyEmail} | VAT: 4890281928`, 15, 24);
+
+      // Document Type & Number Banner
+      pdf.setFillColor(248, 250, 252);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(15, 36, 180, 18, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(13);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(formData.documentType.toUpperCase(), 20, 45);
+
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(6, 78, 59);
+      pdf.text(`Doc Ref: #${formData.documentNumber}`, 20, 50);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Issue Date: ${formData.date}`, 130, 44);
+      pdf.text(`Due Date: ${formData.dueDate}`, 130, 50);
+
+      // Client / Supplier Information
+      let yPos = 62;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(formData.documentType.includes('Purchase Order') ? 'SUPPLIER DETAILS:' : 'BILLED TO (CLIENT / GUEST):', 15, yPos);
+      
+      yPos += 5;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(`${formData.clientOrSupplierName}`, 15, yPos);
+      yPos += 4.5;
+      pdf.text(`Email: ${formData.clientEmail}`, 15, yPos);
+      if (formData.clientAddress) {
+        yPos += 4.5;
+        pdf.text(`Address: ${formData.clientAddress}`, 15, yPos);
+      }
+      if (formData.taxNumber) {
+        yPos += 4.5;
+        pdf.text(`VAT / Tax Number: ${formData.taxNumber}`, 15, yPos);
+      }
+
+      // NOTE: Wi-Fi passcode and username are strictly excluded on all accounting documents per user instructions.
+      // (No Wi-Fi credentials included)
+
+      // Line items table
+      yPos += 8;
+      pdf.setFillColor(241, 245, 249);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(15, yPos, 180, 7, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('DESCRIPTION / ITEM', 18, yPos + 4.8);
+      pdf.text('QTY', 115, yPos + 4.8);
+      pdf.text('UNIT PRICE (ZAR)', 135, yPos + 4.8);
+      pdf.text('TOTAL (ZAR)', 168, yPos + 4.8);
+
+      yPos += 7;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+
+      formData.items.forEach((item) => {
+        if (yPos > 260) {
+          pdf.addPage();
+          yPos = 20;
+        }
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(`${item.description}`, 18, yPos + 4.5);
+        pdf.text(`${item.quantity}`, 118, yPos + 4.5);
+        pdf.text(`R ${item.unitPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, 135, yPos + 4.5);
+        pdf.text(`R ${item.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, 168, yPos + 4.5);
+
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(15, yPos + 6, 195, yPos + 6);
+        yPos += 6;
+      });
+
+      // Totals summary
+      yPos += 4;
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(125, yPos, 195, yPos);
+      yPos += 5;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text('Subtotal:', 130, yPos);
+      pdf.text(`R ${formData.subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, 168, yPos);
+
+      yPos += 5;
+      pdf.text('VAT (15% Included):', 130, yPos);
+      pdf.text(`R ${(formData.vatAmount ?? formData.taxAmount ?? 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, 168, yPos);
+
+      yPos += 6;
+      pdf.setFillColor(240, 253, 244);
+      pdf.rect(125, yPos - 4, 70, 8, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(6, 78, 59);
+      pdf.text('Grand Total:', 130, yPos + 2);
+      pdf.text(`R ${formData.grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, 168, yPos + 2);
+
+      // Official Bank Details
+      yPos += 14;
+      if (yPos > 250) {
+        pdf.addPage();
+        yPos = 20;
+      }
+
+      pdf.setFillColor(248, 250, 252);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.rect(15, yPos, 180, 22, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('OFFICIAL BANK PAYMENT PARTICULARS (UNIVERSAL SETTLEMENT):', 20, yPos + 5.5);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Bank: ${bank?.bankName || 'First National Bank (FNB)'} | Acc Name: ${companyTitle}`, 20, yPos + 10.5);
+      pdf.text(`Account No: ${bank?.accountNumber || '62899401293'} | Branch Code: ${bank?.branchCode || '210214'}`, 20, yPos + 15);
+      pdf.text(`Swift/BIC: FIRNZAJJ | Payment Reference: ${formData.documentNumber}`, 20, yPos + 19.5);
+
+      // Terms & Notes
+      yPos += 26;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Terms: ${formData.terms || 'Payment due within 7 days of invoice date.'}`, 15, yPos);
+      if (formData.notes) {
+        yPos += 4;
+        pdf.text(`Notes: ${formData.notes}`, 15, yPos);
+      }
+
+      // Footer
+      pdf.setFontSize(7);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text(`Generated by ${companyTitle} Official Accounting System • Universal Printer Compatible`, 15, 290);
+
+      addPdfWatermarkAndEmblem(pdf);
+      pdf.save(`${formData.documentType.replace(/\s+/g, '_')}_${formData.documentNumber}.pdf`);
+    } catch (err) {
+      console.error('Error generating Accounting PDF:', err);
+      window.print();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Document Action Bar */}
@@ -159,6 +350,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
         documentNumber={formData.documentNumber}
         recipientEmail={formData.clientEmail}
         onSave={handleSaveDoc}
+        onPrint={handlePrint}
+        onPdf={handleDownloadPdf}
       />
 
       {/* Main Top Navigation Sub-Tabs */}
@@ -333,7 +526,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${
@@ -350,28 +543,53 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
                 >
                   Save Changes
                 </button>
+                <button
+                  onClick={handlePrint}
+                  className="px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 rounded-lg shadow-sm flex items-center gap-1.5"
+                  title="Print on all inkjet, laserjet, and inktank printers (Universal Drivers)"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                  Print (Inkjet/Laser/Inktank)
+                </button>
+                <button
+                  onClick={handleDownloadPdf}
+                  className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm flex items-center gap-1.5"
+                  title="Download Official PDF (Wi-Fi credentials securely excluded)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  PDF (Secure)
+                </button>
               </div>
             </div>
 
             {/* Official Guest House Letterhead Design */}
             <div className="space-y-6">
-              {/* Document Header */}
-              <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
-                <div>
-                  <h1 className="font-serif-luxury text-xl md:text-2xl font-bold text-slate-950">
-                    {GUEST_HOUSE_INFO.name}
-                  </h1>
-                  <p className="text-xs text-emerald-700 font-medium italic">
-                    "{GUEST_HOUSE_INFO.tagline}"
-                  </p>
-                  <div className="text-[11px] text-slate-600 mt-2 space-y-0.5">
-                    <div>{GUEST_HOUSE_INFO.address}</div>
-                    <div>Tel: {GUEST_HOUSE_INFO.contactNumbers} | VAT Reg: 4890281928</div>
-                    <div>Email: {GUEST_HOUSE_INFO.email} | Web: {GUEST_HOUSE_INFO.webAddress}</div>
+              {/* Document Header - Official Corporate Stationery */}
+              <div className="flex flex-col sm:flex-row items-start justify-between border-b-2 border-slate-900 pb-5 gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="shrink-0 bg-slate-900 p-1.5 rounded-xl border border-slate-800 shadow-xs">
+                    <img 
+                      src={companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl} 
+                      alt={companyInfo?.name || GUEST_HOUSE_INFO.name} 
+                      className="h-14 sm:h-16 w-auto object-contain rounded-lg max-w-[180px]"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="font-serif-luxury text-xl md:text-2xl font-bold text-slate-950">
+                      {companyInfo?.name || GUEST_HOUSE_INFO.name}
+                    </h1>
+                    <p className="text-xs text-emerald-700 font-medium italic">
+                      "{companyInfo?.subTagline || companyInfo?.tagline || GUEST_HOUSE_INFO.tagline}"
+                    </p>
+                    <div className="text-[11px] text-slate-600 mt-1 space-y-0.5">
+                      <div>{companyInfo?.address || GUEST_HOUSE_INFO.address}</div>
+                      <div>Tel: {companyInfo?.telephone || GUEST_HOUSE_INFO.contactNumbers} | VAT Reg: 4890281928</div>
+                      <div>Email: {companyInfo?.email || GUEST_HOUSE_INFO.email} | Web: {companyInfo?.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <h2 className="text-xl font-bold text-slate-900 uppercase tracking-wider">
                     {formData.documentType}
                   </h2>

@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 import { D3MonthlySalesLineChart, TWELVE_MONTHS_HISTORICAL_SALES } from './D3MonthlySalesLineChart';
 import {
   MONTHLY_KPI_DATA,
@@ -381,6 +382,7 @@ export const DashboardKpiSummaryRow: React.FC<DashboardKpiSummaryRowProps> = ({
         pageHeight - 16
       );
 
+      addPdfWatermarkAndEmblem(doc);
       doc.save(`DeHoop_Growth_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Error generating PDF report:', err);

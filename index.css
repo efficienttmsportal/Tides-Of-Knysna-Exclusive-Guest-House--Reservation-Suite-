@@ -25,15 +25,21 @@
 
 @media print {
   @page {
-    margin: 12mm 15mm;
+    margin: 10mm 12mm;
     size: auto;
   }
   
-  body {
+  /* Universal Printer Driver Hardware Compatibility: Laserjet, Inkjet, Inktank (HP, Epson, Canon, Brother, Kyocera, Xerox, Ricoh, Lexmark) */
+  html, body {
     background-color: #ffffff !important;
+    background: #ffffff !important;
     color: #0f172a !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    font-smooth: always;
+    -webkit-font-smoothing: subpixel-antialiased;
+    text-rendering: geometricPrecision;
   }
   
   .no-print,
@@ -42,46 +48,109 @@
   footer,
   button:not(.printable-btn),
   .toast,
-  #header-status-bar {
+  #header-status-bar,
+  aside,
+  [data-no-print="true"] {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .printable-area,
   .print-container,
-  #guest-printable-document-canvas {
+  #guest-printable-document-canvas,
+  #universal-printable-canvas {
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
     width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+    background: #ffffff !important;
+    grid-column: 1 / -1 !important;
+  }
+
+  .print-modal-wrapper,
+  .print-modal-wrapper > div {
+    position: static !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
     display: block !important;
   }
 
   #guest-folder-root {
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
   }
 
-  /* Prevent page breaks inside cards, tables, and signature blocks */
+  /* Prevent awkward page break clipping across all printer hardware engines (Laserjet drum, Inkjet piezoelectric & thermal nozzles, Inktank continuous ink supply) */
   .card,
   tr,
+  tbody,
+  thead,
   table,
   .rounded-2xl,
   .rounded-3xl,
   .border,
   img,
-  canvas {
+  canvas,
+  svg {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
-  /* Universal Print & Inkjet contrast optimization */
-  h1, h2, h3, h4, h5, h6, strong {
+  /* Logical page breaks for multi-page reservation dossiers and inventory reports */
+  .dossier-section-break,
+  .inventory-report-page,
+  .print-page-break {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  /* Print watermark across every printed page */
+  body::before {
+    content: "TIDES OF KNYSNA • OFFICIAL SECURE HARD COPY RECORD";
+    position: fixed;
+    top: 40%;
+    left: 10%;
+    font-size: 22pt;
+    font-weight: bold;
+    color: rgba(15, 23, 42, 0.05) !important;
+    transform: rotate(-30deg);
+    z-index: 99999;
+    pointer-events: none;
+    text-transform: uppercase;
+    white-space: nowrap;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* High-contrast crisp typography for all pigment & dye ink heads and laser toners */
+  h1, h2, h3, h4, h5, h6, strong, th {
     color: #000000 !important;
   }
 
-  p, span, td, th {
-    color: #1e293b !important;
+  p, span, td, div {
+    color: #0f172a !important;
+  }
+
+  /* Preserve sharp logo & imagery rendering on continuous ink systems & laser toners */
+  img, svg {
+    max-width: 100% !important;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
   }
 }
 

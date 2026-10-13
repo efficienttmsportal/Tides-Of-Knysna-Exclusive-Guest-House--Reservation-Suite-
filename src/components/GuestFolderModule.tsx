@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import jsPDF from 'jspdf';
+import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 import { 
   FileText, 
   Printer, 
@@ -172,14 +173,17 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const companyTitle = companyInfo?.name || GUEST_HOUSE_INFO.name;
-      const companySub = companyInfo?.subtitle || 'EXCLUSIVE GUEST HOUSE • 5-STAR BOUTIQUE RETREAT';
+      const companySub = companyInfo?.subTagline || companyInfo?.tagline || 'EXCLUSIVE GUEST HOUSE • 5-STAR BOUTIQUE RETREAT';
       const companyAddr = companyInfo?.address || GUEST_HOUSE_INFO.address;
       const companyTel = companyInfo?.mobile || GUEST_HOUSE_INFO.mobile;
       const companyEmail = companyInfo?.email || GUEST_HOUSE_INFO.email;
+      const effectiveLogo = companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl;
 
-      // Header background
+      // Header background - Official Corporate Stationery
       pdf.setFillColor(6, 78, 59); // deep emerald
       pdf.rect(0, 0, 210, 32, 'F');
+
+      // Corporate Stationery Branding Header
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(16);
@@ -208,6 +212,9 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
       pdf.setFontSize(9);
       pdf.setTextColor(15, 23, 42);
 
+      // Privacy check: Only allow Wi-Fi passcode/username on Welcome Letter or dedicated Wi-Fi certificate
+      const isWelcomeOrWifiDoc = activeDoc === 'welcome' || activeDoc === 'wifi';
+
       let yPos = 62;
       pdf.text(`Guest: ${guestFullName}`, 15, yPos);
       pdf.text(`Ref: ${reservation.reservationNumber}`, 120, yPos);
@@ -216,7 +223,12 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
       pdf.text(`Status: ${reservation.paymentStatus} (${reservation.paymentMethod})`, 120, yPos);
       yPos += 6;
       pdf.text(`Dates: ${reservation.checkInDate} to ${reservation.checkOutDate} (${reservation.totalNights} Nights)`, 15, yPos);
-      pdf.text(`Door PIN: ${roomPinCode} | Wi-Fi: ${wifiPassword}`, 120, yPos);
+      if (isWelcomeOrWifiDoc) {
+        pdf.text(`Door PIN: ${roomPinCode} | Wi-Fi: ${wifiPassword}`, 120, yPos);
+      } else {
+        // Refrain from sending Wi-Fi passcode and username on departure, invoicing, statement, and accounting documents
+        pdf.text(`Door PIN: ${roomPinCode}`, 120, yPos);
+      }
 
       yPos += 8;
       pdf.setDrawColor(203, 213, 225);
@@ -267,6 +279,8 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
       pdf.text('Tourism Grading Council of South Africa (TGCSA) Graded ★★★★★ • VAT Reg: 4890281928', 15, yPos);
       yPos += 3.5;
       pdf.text(`Duty Manager Hotline: ${dutyManagerMobile} • reservations@tidesofknysna.co.za`, 15, yPos);
+
+      addPdfWatermarkAndEmblem(pdf);
 
       pdf.save(`${docName.replace(/\s+/g, '_')}_${reservation.customerSurname}_${reservation.reservationNumber}.pdf`);
       setShareFeedbackNotice(`Downloaded ${docName} as Adobe PDF successfully!`);
@@ -340,6 +354,10 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
   // Generate Email and WhatsApp Sharable Text for Document
   const getDocumentSummaryText = (type: GuestDocType) => {
     const baseGreeting = `Dear ${guestFullName},\n\nWe have prepared your official ${docNavItems.find(d => d.id === type)?.title || 'documentation'} for your stay at Tides of Knysna Exclusive Guest House.\n\n`;
+    const isWelcomeOrWifi = type === 'welcome' || type === 'wifi';
+    const wifiLine = isWelcomeOrWifi 
+      ? `📶 Wi-Fi SSID: ${wifiNetwork} | Password: ${wifiPassword}\n\n`
+      : `📶 Wi-Fi: Provided separately on your official Welcome Letter.\n\n`;
     const stayDetails = 
       `🏨 Suite: Room ${reservation.roomNumber} (${reservation.roomAllocation})\n` +
       `📅 Arrival Date: ${reservation.checkInDate}\n` +
@@ -347,7 +365,7 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
       `⏳ Stay Duration: ${reservation.totalNights} Nights (${reservation.numberOfGuests} Guests)\n` +
       `🔖 Booking Reference: ${reservation.reservationNumber}\n` +
       `🔑 Suite Door PIN: ${roomPinCode}\n` +
-      `📶 Wi-Fi SSID: ${wifiNetwork} | Password: ${wifiPassword}\n\n`;
+      wifiLine;
 
     let specificText = '';
     if (type === 'invoice') {
@@ -545,10 +563,10 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
             <button
               onClick={handlePrintDocument}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition"
-              title="Print on any printer (Universal Driver, Laser, Inkjet & Adobe PDF)"
+              title="Universal Print Driver: Compatible with all Inkjet, Laserjet, and Inktank printers (HP, Epson, Canon, Brother, Xerox, Lexmark, Ricoh)"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Active Document</span>
+              <span>Print (Inkjet, Laser, Inktank)</span>
             </button>
 
             <button
@@ -729,10 +747,10 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
               <button
                 onClick={handlePrintDocument}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm"
-                title="Print on Laser / Inkjet / PDF printer"
+                title="Universal Print Driver: Direct output to Inkjet, Laserjet, and Inktank printers"
               >
                 <Printer className="w-3.5 h-3.5" />
-                Print Any Printer
+                Print (All Printers)
               </button>
             </div>
           </div>
@@ -746,19 +764,29 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
           >
             {/* OFFICIAL LETTERHEAD (Rendered on every printed & downloaded doc) */}
             <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div>
-                <span className="font-serif-luxury font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 block">
-                  TIDES OF KNYSNA
-                </span>
-                <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-800 block mt-0.5">
-                  Exclusive Guest House • 5-Star Boutique Retreat
-                </span>
-                <p className="text-xs text-slate-500 mt-1">
-                  14 Waterfront Promenade, Knysna Lagoon Vista, Garden Route 6571, South Africa
-                </p>
-                <p className="text-xs text-slate-500">
-                  Tel: +27 (0)44 382 1234 • Concierge Mobile & WhatsApp: {dutyManagerMobile}
-                </p>
+              <div className="flex items-start gap-4">
+                {/* Official Corporate Logo on Stationery */}
+                <div className="shrink-0 bg-slate-900 p-1.5 rounded-xl border border-slate-800 shadow-xs">
+                  <img 
+                    src={companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl} 
+                    alt={companyInfo?.name || GUEST_HOUSE_INFO.name} 
+                    className="h-14 sm:h-16 w-auto object-contain rounded-lg max-w-[180px] sm:max-w-[220px]"
+                  />
+                </div>
+                <div>
+                  <span className="font-serif-luxury font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 block">
+                    {companyInfo?.name || GUEST_HOUSE_INFO.name}
+                  </span>
+                  <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-800 block mt-0.5">
+                    {companyInfo?.subTagline || companyInfo?.tagline || 'Exclusive Guest House • 5-Star Boutique Retreat'}
+                  </span>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {companyInfo?.address || GUEST_HOUSE_INFO.address}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Tel: {companyInfo?.telephone || GUEST_HOUSE_INFO.contactNumbers} • Concierge Mobile & WhatsApp: {dutyManagerMobile}
+                  </p>
+                </div>
               </div>
 
               <div className="text-left sm:text-right text-xs space-y-1">
@@ -799,7 +827,9 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Suite Credentials</span>
                 <span className="block font-mono text-xs">Door PIN: <strong>{roomPinCode}</strong></span>
-                <span className="block font-mono text-[11px] text-emerald-700">Wi-Fi: <strong>{wifiPassword}</strong></span>
+                {activeDoc === 'welcome' || activeDoc === 'wifi' ? (
+                  <span className="block font-mono text-[11px] text-emerald-700">Wi-Fi: <strong>{wifiPassword}</strong></span>
+                ) : null}
                 <span className="text-[10px] text-slate-400 block">Duty Manager: Eleanor Sterling</span>
               </div>
             </div>

@@ -158,6 +158,7 @@ export interface AccountingDocument {
   clientEmail: string;
   clientPhone: string;
   clientAddress: string;
+  taxNumber?: string;
   companyLogoUrl?: string;
   items: {
     description: string;
@@ -168,6 +169,7 @@ export interface AccountingDocument {
   }[];
   subtotal: number;
   taxAmount: number;
+  vatAmount?: number;
   discount: number;
   grandTotal: number;
   amountPaid: number;
@@ -388,6 +390,20 @@ export interface CompanyInfoData {
     capacity: number;
     defaultRate: number;
   }[];
+}
+
+export interface UploadedPolicyDocument {
+  id: string;
+  title: string;
+  category: string;
+  strictness: 'Mandatory' | 'Standard' | 'Information';
+  fileName: string;
+  fileSize: string;
+  fileType: string;
+  uploadedAt: string;
+  uploadedBy: 'Admin' | 'Guest';
+  dataUrl?: string;
+  notes?: string;
 }
 
 export interface SocialTemplate {

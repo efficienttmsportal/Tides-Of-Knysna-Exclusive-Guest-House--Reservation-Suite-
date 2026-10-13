@@ -59,6 +59,7 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
     `Dear Valued Guest / Partner,\n\nPlease find attached the official copy of your ${documentTitle} from ${GUEST_HOUSE_INFO.name}.\n\nIf you have any questions or require modifications, please contact our guest experience team at ${GUEST_HOUSE_INFO.telephone}.\n\nWarm regards,\nEleanor Sterling\nHead of Guest Experience\n${GUEST_HOUSE_INFO.name}`
   );
   const [emailSentToast, setEmailSentToast] = useState(false);
+  const [mfdNotice, setMfdNotice] = useState<string | null>(null);
 
   // Scan / Upload state
   const [selectedDocType, setSelectedDocType] = useState('passport');
@@ -154,10 +155,10 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
           id={`btn-print-${documentTitle.toLowerCase().replace(/\s+/g, '-')}`}
           onClick={handlePrint}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 hover:text-slate-900 transition shadow-sm"
-          title="Print document on any printer"
+          title="Print document on any printer (Universal Driver: Inkjet, Laserjet, Inktank)"
         >
           <Printer className="w-3.5 h-3.5 text-slate-600" />
-          Print
+          Print (Inkjet/Laser/Inktank)
         </button>
 
         {/* PDF */}
@@ -202,7 +203,8 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
                 stream.getTracks().forEach(t => t.stop());
               }).catch(() => {});
             }
-            alert(`Initializing TWAIN / SANE hardware interface for multi-function printer/scanner device...\n\nConnected to De Hoop MFD Scanner (HP LaserJet Flow M528 / Canon imageRUNNER).\nReady to feed physical policy document.`);
+            setMfdNotice('Initializing TWAIN / SANE universal interface for MFD scanner (HP LaserJet Flow / Canon imageRUNNER / Epson EcoTank)...');
+            setTimeout(() => setMfdNotice(null), 4000);
             setShowScanModal(true);
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm"
@@ -239,6 +241,17 @@ export const DocumentActionBar: React.FC<DocumentActionBarProps> = ({
           <div>
             <div className="text-xs font-bold text-emerald-300">Email Dispatched Successfully</div>
             <div className="text-[11px] text-slate-300">Copy of {documentTitle} delivered to {emailTo}</div>
+          </div>
+        </div>
+      )}
+
+      {/* MFD Scanner Toast */}
+      {mfdNotice && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-fade-in no-print">
+          <Scan className="w-5 h-5 text-indigo-400 shrink-0" />
+          <div>
+            <div className="text-xs font-bold text-indigo-300">MFD Scanner Connected</div>
+            <div className="text-[11px] text-slate-300">{mfdNotice}</div>
           </div>
         </div>
       )}

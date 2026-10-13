@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import jsPDF from 'jspdf';
+import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 import { 
   Megaphone, 
   Hash, 
@@ -418,6 +419,7 @@ export const MarketingModule: React.FC<MarketingModuleProps> = ({
       yPos += 3.5;
       pdf.text(`Reservations & Marketing: ${companyTel} • ${companyEmail}`, 15, yPos);
 
+      addPdfWatermarkAndEmblem(pdf);
       pdf.save(`${title.replace(/[^a-zA-Z0-9]/g, '_')}_Adobe_PDF.pdf`);
       setSaveSuccessMsg(`Downloaded ${title} as Adobe PDF successfully!`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);

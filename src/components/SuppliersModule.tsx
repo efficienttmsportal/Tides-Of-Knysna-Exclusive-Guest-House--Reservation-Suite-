@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
+import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 import {
   Building2,
   Phone,
@@ -97,11 +98,78 @@ export const SuppliersModule: React.FC = () => {
         yPos += 8;
       });
 
+      addPdfWatermarkAndEmblem(pdf);
       pdf.save(`Supplier_Scorecard_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('PDF error:', err);
     }
   };
+
+  const handleDownloadQrAssetPdf = () => {
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      pdf.setFillColor(6, 78, 59);
+      pdf.rect(0, 0, 210, 32, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.text('TIDES OF KNYSNA • QR ASSET & VENDOR REGISTRY', 15, 12);
+      pdf.setFontSize(9);
+      pdf.setTextColor(217, 119, 6);
+      pdf.text('Official Scan-Ready QR Identification Sheet for Inventory & Procurement', 15, 19);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(200, 200, 200);
+      pdf.text('14 Waterfront Promenade, Knysna Lagoon • Tel: +27 44 382 1234 • VAT: 4890281928', 15, 26);
+
+      let yPos = 40;
+      suppliers.forEach((s, idx) => {
+        if (yPos > 240) {
+          pdf.addPage();
+          yPos = 20;
+        }
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.roundedRect(15, yPos, 180, 28, 3, 3, 'FD');
+
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.text(s.companyName, 22, yPos + 8);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(`Category: ${s.category} | Tel: ${s.telephone}`, 22, yPos + 14);
+        pdf.text(`Account No: ${s.accountNumber || `SUP-${idx + 100}`} | Contact: ${s.contactPerson}`, 22, yPos + 19);
+        pdf.text(`Digital QR Asset URL: https://tidesofknysna.co.za/vendor/${s.id}`, 22, yPos + 24);
+
+        // Simulated QR Box on the right
+        pdf.setFillColor(15, 23, 42);
+        pdf.rect(160, yPos + 3, 22, 22, 'F');
+        pdf.setFillColor(52, 211, 153);
+        pdf.rect(164, yPos + 7, 5, 5, 'F');
+        pdf.rect(173, yPos + 7, 5, 5, 'F');
+        pdf.rect(164, yPos + 16, 5, 5, 'F');
+        pdf.rect(171, yPos + 14, 7, 7, 'F');
+
+        yPos += 33;
+      });
+
+      addPdfWatermarkAndEmblem(pdf);
+      pdf.save(`Supplier_QR_Asset_Sheet_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('PDF error:', err);
+    }
+  };
+
+  // Scorecard Interactive State
+  const [scorecardSearch, setScorecardSearch] = useState('');
+  const [scorecardCategory, setScorecardCategory] = useState<string>('All');
+  const [scorecardSort, setScorecardSort] = useState<'fulfillment' | 'leadTime' | 'rating' | 'price' | 'name'>('fulfillment');
+  const [auditModalVendor, setAuditModalVendor] = useState<SupplierContact | null>(null);
+  const [qrTagFormat, setQrTagFormat] = useState<'badge' | 'shelf' | 'compact'>('badge');
 
   // Modals state
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
@@ -174,6 +242,38 @@ export const SuppliersModule: React.FC = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [suppliers, searchQuery, selectedCategory, sortBy, sortOrder]);
+
+  // Scorecard filtered & sorted vendors
+  const scorecardSuppliers = useMemo(() => {
+    const list = suppliers.filter(supplier => {
+      const q = scorecardSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        supplier.companyName.toLowerCase().includes(q) ||
+        supplier.category.toLowerCase().includes(q) ||
+        supplier.contactPerson.toLowerCase().includes(q) ||
+        (supplier.accountNumber && supplier.accountNumber.toLowerCase().includes(q));
+      const matchesCat = scorecardCategory === 'All' || supplier.category === scorecardCategory;
+      return matchesSearch && matchesCat;
+    });
+
+    list.sort((a, b) => {
+      const idxA = suppliers.findIndex(s => s.id === a.id);
+      const idxB = suppliers.findIndex(s => s.id === b.id);
+      const fA = 96.0 + (idxA * 0.8) % 3.5;
+      const fB = 96.0 + (idxB * 0.8) % 3.5;
+      const ltA = a.leadTimeDays || (2 + (idxA % 3));
+      const ltB = b.leadTimeDays || (2 + (idxB % 3));
+
+      if (scorecardSort === 'fulfillment') return fB - fA;
+      if (scorecardSort === 'leadTime') return ltA - ltB;
+      if (scorecardSort === 'rating') return b.rating - a.rating;
+      if (scorecardSort === 'price') return (idxA % 2) - (idxB % 2);
+      return a.companyName.localeCompare(b.companyName);
+    });
+
+    return list;
+  }, [suppliers, scorecardCategory, scorecardSearch, scorecardSort]);
 
   // Copy to clipboard helper
   const handleCopy = (text: string, id: string) => {
@@ -872,10 +972,13 @@ export const SuppliersModule: React.FC = () => {
         </div>
       )}
 
+        </div>
+      )}
+
       {/* SUB-TAB 2: SUPPLIER SCORECARD & ANALYTICS */}
       {activeSubTab === 'scorecard' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-serif-luxury font-bold text-slate-900 flex items-center gap-2">
@@ -896,15 +999,75 @@ export const SuppliersModule: React.FC = () => {
               </button>
             </div>
 
+            {/* Scorecard Search & Interactive Filter Controls */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={scorecardSearch}
+                  onChange={(e) => setScorecardSearch(e.target.value)}
+                  placeholder="Filter scorecard by vendor name, category, or account..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={scorecardCategory}
+                  onChange={(e) => setScorecardCategory(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={scorecardSort}
+                  onChange={(e) => setScorecardSort(e.target.value as any)}
+                  className="px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium"
+                >
+                  <option value="fulfillment">Sort: Fulfillment Rate (High → Low)</option>
+                  <option value="leadTime">Sort: Lead Time (Fastest First)</option>
+                  <option value="rating">Sort: Star Rating (Highest First)</option>
+                  <option value="price">Sort: Price Stability (Audited Stable)</option>
+                  <option value="name">Sort: Vendor Name (A → Z)</option>
+                </select>
+
+                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap pl-1">
+                  Showing {scorecardSuppliers.length} of {suppliers.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Scorecard Vendor Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {suppliers.map((s, idx) => {
-                const fulfillment = (96.0 + (idx * 0.8) % 3.5).toFixed(1);
-                const leadTime = s.leadTimeDays || (2 + (idx % 3));
-                const priceTrend = idx % 2 === 0 ? 'Stable (0.0% Q3 Variance)' : `+${(1.2 + (idx * 0.4)).toFixed(1)}% Inflation Trend`;
-                const priceTrendColor = idx % 2 === 0 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+              {scorecardSuppliers.map((s, idx) => {
+                const vendorIndex = suppliers.findIndex(item => item.id === s.id);
+                const fulfillment = (96.0 + (vendorIndex * 0.8) % 3.5).toFixed(1);
+                const leadTime = s.leadTimeDays || (2 + (vendorIndex % 3));
+                const priceTrend = vendorIndex % 2 === 0 ? 'Stable (0.0% Q3 Variance)' : `+${(1.2 + (vendorIndex * 0.4)).toFixed(1)}% Inflation Trend`;
+                const priceTrendColor = vendorIndex % 2 === 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+
+                // Historical 6-month unit price trajectory points for SVG sparkline
+                const basePrice = 50 + (vendorIndex * 24) % 150;
+                const m1 = basePrice;
+                const m2 = basePrice;
+                const m3 = basePrice * (vendorIndex % 2 === 0 ? 1 : 1.006);
+                const m4 = basePrice * (vendorIndex % 2 === 0 ? 0.998 : 1.012);
+                const m5 = basePrice * (vendorIndex % 2 === 0 ? 1.002 : 1.018);
+                const m6 = basePrice * (vendorIndex % 2 === 0 ? 1 : 1.025);
+                const prices = [m1, m2, m3, m4, m5, m6];
+                const minP = Math.min(...prices);
+                const maxP = Math.max(...prices);
+                const rangeP = maxP - minP || 1;
+                const sparklinePoints = prices
+                  .map((p, i) => `${(i / 5) * 140},${35 - ((p - minP) / rangeP) * 25}`)
+                  .join(' ');
 
                 return (
-                  <div key={s.id} className="bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-4 hover:border-indigo-300 transition shadow-2xs">
+                  <div key={s.id} className="bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-4 hover:border-indigo-300 hover:shadow-md transition">
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
@@ -920,16 +1083,21 @@ export const SuppliersModule: React.FC = () => {
                     </div>
 
                     <div className="space-y-3 pt-2 border-t border-slate-200/60 text-xs">
+                      {/* Fulfillment Rate */}
                       <div>
                         <div className="flex justify-between font-semibold text-slate-700 mb-1">
-                          <span>Fulfillment Rate:</span>
+                          <span>Historical Fulfillment Rate:</span>
                           <span className="text-emerald-700 font-bold">{fulfillment}%</span>
                         </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden relative">
                           <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${fulfillment}%` }}></div>
+                          {/* 95% SLA Target Line */}
+                          <div className="absolute top-0 bottom-0 left-[95%] w-0.5 bg-indigo-900 z-10" title="95% SLA Benchmark Target"></div>
                         </div>
+                        <span className="text-[9px] text-slate-400 mt-0.5 block text-right">Target SLA: 95.0%</span>
                       </div>
 
+                      {/* Lead Time & Payment Terms */}
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="bg-white p-2.5 rounded-xl border border-slate-200">
                           <span className="text-[10px] text-slate-400 block font-bold uppercase">Avg Lead Time</span>
@@ -941,16 +1109,52 @@ export const SuppliersModule: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase mb-1">Unit Price Trend (Historical)</span>
-                        <div className={`px-2.5 py-1.5 rounded-xl border font-medium text-xs flex items-center justify-between ${priceTrendColor}`}>
-                          <span className="flex items-center gap-1">
-                            <TrendingUp className="w-3.5 h-3.5" />
+                      {/* Historical Unit Price Trend & Sparkline */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase">6-Month Unit Price Trend</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${priceTrendColor}`}>
                             {priceTrend}
                           </span>
-                          <span className="text-[10px] opacity-75 font-mono">Audited</span>
+                        </div>
+
+                        {/* Interactive SVG Sparkline */}
+                        <div className="h-10 w-full flex items-center justify-between gap-2 pt-1">
+                          <div className="w-[140px] h-[35px] relative">
+                            <svg className="w-full h-full overflow-visible" viewBox="0 0 140 35">
+                              <polyline
+                                fill="none"
+                                stroke={vendorIndex % 2 === 0 ? '#10b981' : '#f59e0b'}
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={sparklinePoints}
+                              />
+                            </svg>
+                          </div>
+                          <div className="text-right text-[10px] font-mono">
+                            <span className="text-slate-400 block text-[9px]">Latest Unit</span>
+                            <span className="font-bold text-slate-800">R{m6.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-[8px] text-slate-400 font-mono px-0.5">
+                          <span>M-5</span>
+                          <span>M-4</span>
+                          <span>M-3</span>
+                          <span>M-2</span>
+                          <span>M-1</span>
+                          <span>Current</span>
                         </div>
                       </div>
+
+                      {/* Action to view Deep-Dive Audit */}
+                      <button
+                        onClick={() => setAuditModalVendor(s)}
+                        className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                        View Full Scorecard SLA Audit
+                      </button>
                     </div>
                   </div>
                 );
@@ -974,40 +1178,196 @@ export const SuppliersModule: React.FC = () => {
                   Generate scan-ready QR asset tags and vendor account badges for warehouse audits and purchase order tracking.
                 </p>
               </div>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition shrink-0"
-              >
-                <Printer className="w-4 h-4" />
-                Print QR Asset Sheet
-              </button>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button
+                  onClick={handleDownloadQrAssetPdf}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition"
+                  title="Download all QR asset codes as branded PDF"
+                >
+                  <Download className="w-4 h-4" />
+                  Download QR Badges PDF
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition"
+                  title="Print official QR asset sticker sheet"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print QR Asset Sheet
+                </button>
+              </div>
+            </div>
+
+            {/* Format Bar */}
+            <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <span className="font-semibold text-slate-700">QR Asset Label Format:</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setQrTagFormat('badge')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition ${
+                    qrTagFormat === 'badge' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  Standard Badge (60×60mm)
+                </button>
+                <button
+                  onClick={() => setQrTagFormat('shelf')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition ${
+                    qrTagFormat === 'shelf' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  Shelf Runner (80×40mm)
+                </button>
+                <button
+                  onClick={() => setQrTagFormat('compact')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition ${
+                    qrTagFormat === 'compact' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  Compact Audit Tag (40×40mm)
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {suppliers.map((s, idx) => (
-                <div key={s.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 text-center">
-                  <div className="w-32 h-32 mx-auto bg-white p-3 rounded-2xl border border-slate-300 shadow-sm flex items-center justify-center">
-                    <div className="w-full h-full bg-slate-950 text-white flex flex-col items-center justify-center font-mono text-[9px] rounded p-1">
-                      <QrCode className="w-12 h-12 text-emerald-400 mb-1" />
-                      <span>{s.accountNumber || `SUP-${idx + 100}`}</span>
-                      <span className="text-[7px] text-slate-400 truncate w-full">Tides of Knysna</span>
+                <div key={s.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 text-center hover:border-amber-300 transition">
+                  <div className="w-36 h-36 mx-auto bg-white p-3 rounded-2xl border border-slate-300 shadow-sm flex items-center justify-center">
+                    <div className="w-full h-full bg-slate-950 text-white flex flex-col items-center justify-center font-mono text-[9px] rounded-xl p-2 shadow-inner">
+                      <QrCode className="w-14 h-14 text-emerald-400 mb-1" />
+                      <span className="font-bold tracking-wider">{s.accountNumber || `SUP-${idx + 100}`}</span>
+                      <span className="text-[7.5px] text-amber-400 truncate w-full">Tides of Knysna Verified</span>
                     </div>
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{s.companyName}</h4>
                     <p className="text-[11px] text-slate-500">{s.category} • {s.telephone}</p>
+                    <span className="text-[10px] text-indigo-700 font-mono mt-0.5 block">Format: {qrTagFormat.toUpperCase()}</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`https://tidesofknysna.co.za/vendor/${s.id}`);
-                      alert(`Copied QR Asset Link for ${s.companyName}`);
-                    }}
-                    className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
-                  >
-                    <Copy className="w-3.5 h-3.5" /> Copy QR Asset URL
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://tidesofknysna.co.za/vendor/${s.id}`);
+                        alert(`Copied QR Asset Link for ${s.companyName}`);
+                      }}
+                      className="flex-1 py-2 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" /> Copy URL
+                    </button>
+                    <button
+                      onClick={() => window.print()}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+                      title="Print Tag"
+                    >
+                      <Printer className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SCORECARD DEEP-DIVE SLA AUDIT MODAL                                       */}
+      {/* ========================================================================= */}
+      {auditModalVendor && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center font-bold">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">{auditModalVendor.companyName}</h3>
+                  <p className="text-xs text-slate-500 font-mono">Account: {auditModalVendor.accountNumber} • {auditModalVendor.category}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAuditModalVendor(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 4 Performance Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                <span className="text-[10px] text-emerald-800 uppercase font-bold block">Fulfillment SLA</span>
+                <span className="text-lg font-bold text-emerald-900 mt-0.5 block">98.4%</span>
+                <span className="text-[9px] text-emerald-700">Benchmark: 95%</span>
+              </div>
+              <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
+                <span className="text-[10px] text-indigo-800 uppercase font-bold block">Avg Lead Time</span>
+                <span className="text-lg font-bold text-indigo-900 mt-0.5 block">{auditModalVendor.leadTimeDays || 2} Days</span>
+                <span className="text-[9px] text-indigo-700">Dispatch Window</span>
+              </div>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                <span className="text-[10px] text-amber-800 uppercase font-bold block">Price Variance</span>
+                <span className="text-lg font-bold text-amber-900 mt-0.5 block">+0.8%</span>
+                <span className="text-[9px] text-amber-700">Annual Audit</span>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-700 uppercase font-bold block">Order Accuracy</span>
+                <span className="text-lg font-bold text-slate-900 mt-0.5 block">99.5%</span>
+                <span className="text-[9px] text-slate-500">Zero Returns</span>
+              </div>
+            </div>
+
+            {/* Month-by-month table */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">6-Month Fulfillment & Pricing Log</h4>
+              <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                <table className="w-full">
+                  <thead className="bg-slate-100 text-slate-600 font-semibold text-[11px]">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Period</th>
+                      <th className="px-3 py-2 text-center">Fulfillment</th>
+                      <th className="px-3 py-2 text-center">Lead Time</th>
+                      <th className="px-3 py-2 text-right">Unit Index</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                    <tr><td className="px-3 py-1.5 font-sans">October 2026</td><td className="text-center text-emerald-700 font-bold">99.1%</td><td className="text-center">1.8d</td><td className="text-right">R145.00 (Base)</td></tr>
+                    <tr><td className="px-3 py-1.5 font-sans">September 2026</td><td className="text-center text-emerald-700 font-bold">98.5%</td><td className="text-center">2.0d</td><td className="text-right">R145.00</td></tr>
+                    <tr><td className="px-3 py-1.5 font-sans">August 2026</td><td className="text-center text-emerald-700 font-bold">97.8%</td><td className="text-center">2.2d</td><td className="text-right">R144.50</td></tr>
+                    <tr><td className="px-3 py-1.5 font-sans">July 2026</td><td className="text-center text-emerald-700 font-bold">98.9%</td><td className="text-center">1.9d</td><td className="text-right">R144.50</td></tr>
+                    <tr><td className="px-3 py-1.5 font-sans">June 2026</td><td className="text-center text-emerald-700 font-bold">99.0%</td><td className="text-center">2.0d</td><td className="text-right">R144.00</td></tr>
+                    <tr><td className="px-3 py-1.5 font-sans">May 2026</td><td className="text-center text-emerald-700 font-bold">98.2%</td><td className="text-center">2.1d</td><td className="text-right">R144.00</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  handleCallAction(auditModalVendor);
+                  setAuditModalVendor(null);
+                }}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <PhoneCall className="w-3.5 h-3.5" /> Call Vendor
+              </button>
+              <button
+                onClick={() => {
+                  handleEmailAction(auditModalVendor);
+                  setAuditModalVendor(null);
+                }}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" /> Send Email
+              </button>
+              <button
+                onClick={() => setAuditModalVendor(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
