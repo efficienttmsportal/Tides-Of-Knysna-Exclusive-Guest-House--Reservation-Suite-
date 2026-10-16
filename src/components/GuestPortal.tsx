@@ -3,6 +3,10 @@ import QRCode from 'qrcode';
 import { 
   KeyRound, 
   BedDouble, 
+  Hotel,
+  HelpCircle,
+  Bus,
+  Palmtree,
   Calendar, 
   Clock, 
   ShieldCheck, 
@@ -614,7 +618,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
             Tides of Knysna Concierge Service
           </div>
           <h1 className="font-serif-luxury text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
-            Guest Self-Service Portal
+            Tides Of Knysna Exclusive Guest House -Guest Portal
           </h1>
           <p className="text-sm text-slate-600 max-w-xl mx-auto">
             Access your confirmed booking details, customize room amenities, submit special requests to your private butler, and explore curated Garden Route experiences.
@@ -623,11 +627,22 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
 
         {/* Login Box */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden max-w-xl mx-auto">
-          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 p-6 text-white text-center border-b border-slate-800">
+          <div 
+            style={{ backgroundColor: '#2b58ff' }}
+            className="p-6 text-white text-center border-b border-slate-800"
+          >
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center mx-auto mb-3">
-              <KeyRound className="w-6 h-6" />
+              <KeyRound 
+                className="w-6 h-6" 
+                style={{ textAlign: 'center', fontSize: '20px', color: '#5fe8bc' }}
+              />
             </div>
-            <h2 className="font-serif-luxury text-xl font-bold">Secure Guest Verification</h2>
+            <h2 
+              className="text-xl font-bold"
+              style={{ color: '#00fd63', fontFamily: 'Arial' }}
+            >
+              Guest Information Hub
+            </h2>
             <p className="text-xs text-slate-300 mt-1">
               Enter your official booking confirmation reference and guest surname as issued on your reservation voucher.
             </p>
@@ -676,7 +691,8 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2"
+              style={{ backgroundColor: '#fcd300', color: '#0753c4' }}
+              className="w-full py-3 font-bold rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2 hover:opacity-95"
             >
               <KeyRound className="w-4 h-4" />
               Sign In to My Guest Portal
@@ -741,21 +757,31 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
         {/* Feature Highlights */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center max-w-3xl mx-auto">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-            <BedDouble className="w-5 h-5 text-emerald-600 mx-auto" />
-            <h4 className="font-bold text-slate-800 text-xs">Accommodation and Reservation Information?</h4>
+            <div className="flex items-center justify-center gap-1.5 mx-auto">
+              <Hotel className="w-5 h-5 text-emerald-600" />
+              <BedDouble className="w-5 h-5 text-indigo-600" />
+              <Info className="w-5 h-5 text-blue-600" />
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs">Accomodation and Reservation Information</h4>
             <p className="text-[11px] text-slate-500">Live view of suite allocation, stay dates, and door access keys.</p>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-            <Sparkles className="w-5 h-5 text-amber-500 mx-auto" />
-            <h4 className="font-bold text-slate-800 text-xs">Special Requests</h4>
+            <div className="flex items-center justify-center gap-1.5 mx-auto">
+              <HelpCircle className="w-5 h-5 text-amber-500" />
+              <Wine className="w-5 h-5 text-rose-500" />
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs">Guest Requirements ?</h4>
             <p className="text-[11px] text-slate-500">Request airport pickups, champagne on ice, or dietary accommodations.</p>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-            <Compass className="w-5 h-5 text-blue-600 mx-auto" />
-            <h4 className="font-bold text-slate-800 text-xs">Concierge Excursions</h4>
-            <p className="text-[11px] text-slate-500">Curated lagoon cruises, oyster dining, and guided forest tours.</p>
+            <div className="flex items-center justify-center gap-1.5 mx-auto">
+              <Bus className="w-5 h-5 text-indigo-600" />
+              <Palmtree className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs">Tourist Attractions and Local Attractions</h4>
+            <p className="text-[11px] text-slate-500">Curated lagoon cruises, oyster dining, shuttle transfers, and beach excursions.</p>
           </div>
         </div>
       </div>
