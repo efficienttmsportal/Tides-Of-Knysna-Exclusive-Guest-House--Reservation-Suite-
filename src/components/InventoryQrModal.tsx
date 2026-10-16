@@ -54,12 +54,22 @@ const QR_THEMES: QrColorTheme[] = [
   { id: 'gold', name: 'Cape Gold', dark: '#78350f', light: '#fffbeb', borderClass: 'border-amber-300', badgeClass: 'bg-amber-600 text-white' }
 ];
 
+export interface ScanHistoryItem {
+  id: string;
+  itemCode: string;
+  itemDescription: string;
+  unit: string;
+  quantity: number;
+  timestamp: string;
+  location: string;
+}
+
 interface InventoryQrModalProps {
   items: InventoryItem[];
   allItems?: InventoryItem[];
   onClose: () => void;
   initialIndex?: number;
-  initialViewMode?: 'single' | 'sheet' | 'scanner';
+  initialViewMode?: 'single' | 'sheet' | 'scanner' | 'history';
   onAdjustStock?: (itemId: string, delta: number, actionType?: any, notes?: string) => void;
   onOpenAuditLog?: (itemId?: string) => void;
   onOpenSupplierEmail?: (supplierName: string, item?: InventoryItem) => void;
@@ -79,13 +89,64 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [activePayloadType, setActivePayloadType] = useState<InventoryQrPayloadType>('quick_scan');
   const [selectedTheme, setSelectedTheme] = useState<QrColorTheme>(QR_THEMES[0]);
-  const [viewMode, setViewMode] = useState<'single' | 'sheet' | 'scanner'>(initialViewMode);
+  const [viewMode, setViewMode] = useState<'single' | 'sheet' | 'scanner' | 'history'>(initialViewMode);
+
+  // Scan history & audio settings states
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([
+    {
+      id: 'sh-1',
+      itemCode: 'TOK-WIN-001',
+      itemDescription: 'Hartenberg Estate Cabernet Sauvignon 2021',
+      unit: 'Bottles',
+      quantity: 24,
+      timestamp: 'Today, 09:15 AM',
+      location: 'Main Wine Cellar Bin C-2'
+    },
+    {
+      id: 'sh-2',
+      itemCode: 'TOK-LIN-004',
+      itemDescription: 'Egyptian Cotton 600TC King Duvet Cover Set',
+      unit: 'Sets',
+      quantity: 12,
+      timestamp: 'Today, 08:30 AM',
+      location: 'Housekeeping Linen Bay B'
+    }
+  ]);
+  const [audioCuesEnabled, setAudioCuesEnabled] = useState<boolean>(true);
+  const [selectedAudioPreset, setSelectedAudioPreset] = useState<'lasertag' | 'chime' | 'beep'>('lasertag');
+  const [scannerLocation, setScannerLocation] = useState<string>('Main Warehouse Bin A-3');
 
   // Scanner state
   const [scannedItemId, setScannedItemId] = useState<string>(items[initialIndex]?.id || catalogPool[0]?.id || '');
   const [scanQuery, setScanQuery] = useState('');
   const [isScanningSimulated, setIsScanningSimulated] = useState(false);
   const [scanNotice, setScanNotice] = useState<string | null>(null);
+
+  // Scanner inactivity timeout state (5 minutes = 300,000 ms)
+  const [isScannerTimedOut, setIsScannerTimedOut] = useState(false);
+  const [lastActivityTime, setLastActivityTime] = useState<number>(Date.now());
+
+  const resetScannerActivity = () => {
+    if (viewMode === 'scanner') {
+      setLastActivityTime(Date.now());
+      if (isScannerTimedOut) {
+        setIsScannerTimedOut(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode !== 'scanner' || isScannerTimedOut) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastActivityTime;
+      if (elapsed >= 300000) { // 5 minutes
+        setIsScannerTimedOut(true);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [viewMode, lastActivityTime, isScannerTimedOut]);
   
   // Single QR code data URL
   const [singleQrDataUrl, setSingleQrDataUrl] = useState<string>('');
@@ -333,6 +394,15 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
               >
                 <Scan className="w-3.5 h-3.5 text-emerald-300" />
                 QR Asset Scanner
+              </button>
+              <button
+                onClick={() => setViewMode('history')}
+                className={`px-2.5 py-1 rounded-md transition flex items-center gap-1.5 ${
+                  viewMode === 'history' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <History className="w-3.5 h-3.5 text-emerald-300" />
+                Scan History & Audio ({scanHistory.length})
               </button>
             </div>
 
@@ -751,14 +821,60 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
               setScannedItemId(itemId);
               setTimeout(() => {
                 setIsScanningSimulated(false);
-                playLaserTagSound();
+                if (audioCuesEnabled) {
+                  playLaserTagSound();
+                }
+                const scannedTarget = catalogPool.find(i => i.id === itemId);
+                if (scannedTarget) {
+                  const newHistoryItem: ScanHistoryItem = {
+                    id: `sh-${Date.now()}`,
+                    itemCode: scannedTarget.itemCode,
+                    itemDescription: scannedTarget.itemDescription,
+                    unit: scannedTarget.unit,
+                    quantity: scannedTarget.howManyOnHand,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (' + new Date().toLocaleDateString() + ')',
+                    location: scannerLocation
+                  };
+                  setScanHistory(prev => [newHistoryItem, ...prev]);
+                }
                 setScanNotice(`✓ Scanned & Verified tag for ${catalogPool.find(i => i.id === itemId)?.itemCode}`);
                 setTimeout(() => setScanNotice(null), 3500);
               }, 400);
             };
 
             return (
-              <div className="space-y-5">
+              <div 
+                className="space-y-5 relative"
+                onMouseMove={resetScannerActivity}
+                onClick={resetScannerActivity}
+              >
+                {/* Auto-Timeout Overlay if inactive for 5 minutes */}
+                {isScannerTimedOut && (
+                  <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in rounded-3xl">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shadow-lg">
+                      <Clock className="w-7 h-7 animate-pulse" />
+                    </div>
+                    <div className="space-y-1.5 max-w-md">
+                      <h3 className="text-white font-serif-luxury font-bold text-lg">
+                        QR Scan-All Mode Paused Due to Inactivity
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        To conserve system resources and QR scan rate, continuous scanning was automatically paused after 5 minutes of inactivity.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsScannerTimedOut(false);
+                        setLastActivityTime(Date.now());
+                      }}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg transition"
+                    >
+                      <Scan className="w-4 h-4" />
+                      Resume QR Scan-All Mode
+                    </button>
+                  </div>
+                )}
+
                 {/* Scanner Interface Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   {/* Left Column: Simulated Camera Viewfinder */}
@@ -1023,6 +1139,191 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
               </div>
             );
           })()}
+
+          {/* ========================================================================= */}
+          {/* VIEW 4: SCAN HISTORY & SCAN SOUND / AUDIO SETTINGS                        */}
+          {/* ========================================================================= */}
+          {viewMode === 'history' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              {/* Top Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+                    <History className="w-3.5 h-3.5" />
+                    Audit Trail & Hardware Preferences
+                  </div>
+                  <h3 className="font-serif-luxury font-bold text-lg">QR Scan History & Audio Settings</h3>
+                  <p className="text-xs text-slate-300">
+                    View logged scan timestamps, specific asset scanner locations, and configure audio feedback preferences.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setScanHistory([])}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold rounded-xl text-xs border border-slate-700 transition"
+                  >
+                    Clear History
+                  </button>
+                  <button
+                    onClick={() => {
+                      const csv = 'data:text/csv;charset=utf-8,' + [
+                        ['Item Code', 'Description', 'Quantity', 'Timestamp', 'Scanner Location'].join(','),
+                        ...scanHistory.map(h => [`"${h.itemCode}"`, `"${h.itemDescription.replace(/"/g, '""')}"`, h.quantity, `"${h.timestamp}"`, `"${h.location}"`].join(','))
+                      ].join('\n');
+                      const link = document.createElement('a');
+                      link.setAttribute('href', encodeURI(csv));
+                      link.setAttribute('download', `TOK-QR-Scan-History-${new Date().toISOString().split('T')[0]}.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export History CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Audio Settings & Scanner Location Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Audio Settings Card */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      Scan Sound / Audio Settings
+                    </h4>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                      {audioCuesEnabled ? 'Active' : 'Muted'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">Enable Scan Audio Cues</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={audioCuesEnabled}
+                          onChange={(e) => setAudioCuesEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-slate-600 font-semibold block">Audio Preset Tone:</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedAudioPreset}
+                          onChange={(e: any) => setSelectedAudioPreset(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="lasertag">High-Fidelity Lasertag Pulse</option>
+                          <option value="chime">Success Chime Bell</option>
+                          <option value="beep">Subtle Scanner Beep</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            playLaserTagSound();
+                          }}
+                          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center gap-1 transition"
+                          title="Test audio cue"
+                        >
+                          Test
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scanner Location Configuration Card */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Building className="w-4 h-4 text-indigo-600" />
+                      Active Scanner Location Tag
+                    </h4>
+                    <span className="text-xs font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                      {scannerLocation}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="space-y-1.5">
+                      <label className="text-slate-600 font-semibold block">Select or Enter Station / Bin Location:</label>
+                      <select
+                        value={scannerLocation}
+                        onChange={(e) => setScannerLocation(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Main Warehouse Bin A-3">Main Warehouse Bin A-3</option>
+                        <option value="Wine Cellar Shelf 2">Wine Cellar Shelf 2</option>
+                        <option value="Housekeeping Linen Bay B">Housekeeping Linen Bay B</option>
+                        <option value="Reception Backroom">Reception Backroom</option>
+                        <option value="Pezula Estate Maintenance Shed">Pezula Estate Maintenance Shed</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-slate-500 text-[11px] block">Custom Location Note:</label>
+                      <input
+                        type="text"
+                        value={scannerLocation}
+                        onChange={(e) => setScannerLocation(e.target.value)}
+                        placeholder="e.g. Poolside Bar Bin 4"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scan History Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <h4 className="font-serif-luxury font-bold text-slate-900 text-base">
+                    Recently Scanned Items ({scanHistory.length})
+                  </h4>
+                  <span className="text-xs text-slate-500">Recorded during current session</span>
+                </div>
+
+                {scanHistory.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400 space-y-2">
+                    <History className="w-8 h-8 mx-auto opacity-40" />
+                    <p className="text-xs">No scan history recorded yet. Switch to the QR Asset Scanner and simulate or scan items.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase font-bold text-[10px]">
+                        <tr>
+                          <th className="p-3">Item Code</th>
+                          <th className="p-3">Description</th>
+                          <th className="p-3">Quantity</th>
+                          <th className="p-3">Scanner Location</th>
+                          <th className="p-3">Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {scanHistory.map(record => (
+                          <tr key={record.id} className="hover:bg-slate-50/80">
+                            <td className="p-3 font-mono font-bold text-emerald-800">{record.itemCode}</td>
+                            <td className="p-3 font-semibold text-slate-900">{record.itemDescription}</td>
+                            <td className="p-3 font-mono text-slate-700">{record.quantity} {record.unit}</td>
+                            <td className="p-3 font-medium text-indigo-700">{record.location}</td>
+                            <td className="p-3 text-slate-500 font-mono">{record.timestamp}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* MODAL FOOTER */}

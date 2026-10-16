@@ -718,23 +718,23 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-sm">Need Login or Booking Help?</span>
+                <span className="font-bold text-white text-sm">Reservation or Login Help ?</span>
                 <span className="text-[10px] bg-[#25D366] text-slate-950 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   24/7 Live
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Message Duty Manager Eleanor on WhatsApp for instant booking reference recovery.
+                Message Tides Of Knysna Exclusive Guest House Concierge on Whatsapp for Instant Booking Reference Recovery.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => handleChatWithManagerWhatsApp('Hi Eleanor, I need assistance logging into my Tides of Knysna Guest Self-Service Portal.')}
+            onClick={() => handleChatWithManagerWhatsApp('Hi Eleanor, I would like to message Tides Of Knysna Exclusive Guest House Concierge on Whatsapp for Instant Booking Reference Recovery.')}
             className="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-md shrink-0 w-full sm:w-auto justify-center"
           >
             <WhatsAppIcon className="w-4 h-4" />
-            <span>Chat on WhatsApp</span>
+            <span>Let's Chat On WhatsApp</span>
           </button>
         </div>
 
@@ -742,7 +742,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center max-w-3xl mx-auto">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <BedDouble className="w-5 h-5 text-emerald-600 mx-auto" />
-            <h4 className="font-bold text-slate-800 text-xs">Room & Stay Details</h4>
+            <h4 className="font-bold text-slate-800 text-xs">Accommodation and Reservation Information?</h4>
             <p className="text-[11px] text-slate-500">Live view of suite allocation, stay dates, and door access keys.</p>
           </div>
 

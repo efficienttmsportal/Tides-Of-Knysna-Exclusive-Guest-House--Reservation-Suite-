@@ -39,20 +39,6 @@ export function addPdfWatermarkAndEmblem(pdf: jsPDF, companyInfo?: any) {
     pdf.setPage(i);
 
     try {
-      // Left-aligned logo (38mm wide by 50mm high)
-      if (logoUrl && (logoUrl.startsWith('data:image/png') || logoUrl.startsWith('data:image/jpeg'))) {
-        const format = logoUrl.includes('jpeg') || logoUrl.includes('jpg') ? 'JPEG' : 'PNG';
-        pdf.addImage(logoUrl, format, logoX, logoY, logoWidth, logoHeight);
-      } else {
-        pdf.setDrawColor(217, 119, 6); // gold border
-        pdf.setFillColor(6, 78, 59); // deep emerald fill
-        pdf.roundedRect(logoX, logoY, logoWidth, logoHeight, 2 * scale, 2 * scale, 'FD');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(isPt ? 11 : 8);
-        pdf.text('TK', logoX + (logoWidth / 2), logoY + (logoHeight / 2), { align: 'center' });
-      }
-
       // Header: "Tides Of Knysna Exclusive Guest House" - Centred
       pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFont('helvetica', 'bold');
@@ -80,7 +66,8 @@ export function addPdfWatermarkAndEmblem(pdf: jsPDF, companyInfo?: any) {
       pdf.setDrawColor(203, 213, 225); // slate-300
       pdf.setLineWidth(isPt ? 0.75 : 0.3);
       const divY = isPt ? 80 : 31;
-      pdf.line(logoX, divY, pageWidth - logoX, divY);
+      const marginX = isPt ? 36 : 14;
+      pdf.line(marginX, divY, pageWidth - marginX, divY);
 
     } catch (e) {
       // Silently continue

@@ -83,6 +83,7 @@ import {
   Percent,
   DollarSign,
   TrendingUp,
+  Scan,
   TrendingDown,
   Star,
   MessageSquare,
@@ -2833,10 +2834,6 @@ export const App: React.FC = () => {
                       className="ml-auto text-slate-500 hover:text-slate-800 font-bold flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-200 transition shrink-0"
                     >
                       <RefreshCw className="w-3 h-3" />
-                      Reset Filters
-                    </button>
-                  )}
-                </div>
                       Reset Filters
                     </button>
                   )}

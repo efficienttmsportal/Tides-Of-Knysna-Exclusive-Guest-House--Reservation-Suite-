@@ -1093,6 +1093,10 @@ export const InventoryForecastingModule: React.FC<InventoryForecastingModuleProp
                   </div>
                 ))}
             </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* TAB 4: EXPIRY FORECAST & SMART REPLENISHMENT CALCULATOR                   */}
       {/* ========================================================================= */}

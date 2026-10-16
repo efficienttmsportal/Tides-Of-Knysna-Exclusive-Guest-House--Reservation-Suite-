@@ -764,23 +764,12 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
           >
             {/* OFFICIAL LETTERHEAD (Rendered on every printed & downloaded doc) */}
             <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-xs">
-                  <img 
-                    src={companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl} 
-                    alt={companyInfo?.name || GUEST_HOUSE_INFO.name} 
-                    style={{ width: '38mm', height: '50mm' }}
-                    className="w-[38mm] h-[50mm] max-w-[38mm] max-h-[50mm] object-contain rounded-lg"
-                  />
-                </div>
-              </div>
-              <div className="text-center flex-1">
+              <div className="text-center sm:text-left flex-1">
                 <span className="font-serif-luxury font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 block">
                   {companyInfo?.name || GUEST_HOUSE_INFO.name}
                 </span>
                 <p className="text-[10px] font-sans font-normal text-slate-700 mt-0.5 leading-tight">
-                  9 Maritime Close Pezula Golf Estate,<br/>
-                  Sparrebosch, Western Cape RSA 6571
+                  9 Maritime Close Pezula Golf Estate, Sparrebosch, Western Cape RSA 6571
                 </p>
                 <p className="text-[8px] font-sans text-slate-600 mt-1">
                   W. www.tidesofknysna.online e. reservations@tidesofknysna.online WhatsApp/concierge +27812662956
