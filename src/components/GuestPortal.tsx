@@ -48,6 +48,7 @@ import {
   RefreshCw,
   FileCheck,
   FolderOpen,
+  QrCode,
   Download
 } from 'lucide-react';
 import { Reservation, AttractionItem, MarketingSpecial } from '../types';

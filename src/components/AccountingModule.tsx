@@ -29,6 +29,8 @@ import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
 export interface AccountingModuleProps {
   reservations?: Reservation[];
   companyInfo?: CompanyInfoData;
+  globalCurrency?: string;
+  formatCurrency?: (amountInZar: number) => string;
 }
 
 export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations = [], companyInfo }) => {
@@ -565,27 +567,28 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ reservations
             {/* Official Guest House Letterhead Design */}
             <div className="space-y-6">
               {/* Document Header - Official Corporate Stationery */}
-              <div className="flex flex-col sm:flex-row items-start justify-between border-b-2 border-slate-900 pb-5 gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="shrink-0 bg-slate-900 p-1.5 rounded-xl border border-slate-800 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-center justify-between border-b-2 border-slate-900 pb-5 gap-4">
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-xs">
                     <img 
                       src={companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl} 
                       alt={companyInfo?.name || GUEST_HOUSE_INFO.name} 
-                      className="h-14 sm:h-16 w-auto object-contain rounded-lg max-w-[180px]"
+                      style={{ width: '38mm', height: '50mm' }}
+                      className="w-[38mm] h-[50mm] max-w-[38mm] max-h-[50mm] object-contain rounded-lg"
                     />
                   </div>
-                  <div>
-                    <h1 className="font-serif-luxury text-xl md:text-2xl font-bold text-slate-950">
-                      {companyInfo?.name || GUEST_HOUSE_INFO.name}
-                    </h1>
-                    <p className="text-xs text-emerald-700 font-medium italic">
-                      "{companyInfo?.subTagline || companyInfo?.tagline || GUEST_HOUSE_INFO.tagline}"
-                    </p>
-                    <div className="text-[11px] text-slate-600 mt-1 space-y-0.5">
-                      <div>Email: {companyInfo?.email || GUEST_HOUSE_INFO.email} | Web: {companyInfo?.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
-                      <div>VAT Reg: 4890281928</div>
-                    </div>
-                  </div>
+                </div>
+                <div className="text-center flex-1">
+                  <h1 className="font-serif-luxury text-xl md:text-2xl font-bold text-slate-950">
+                    {companyInfo?.name || GUEST_HOUSE_INFO.name}
+                  </h1>
+                  <p className="text-[10px] font-sans font-normal text-slate-700 mt-0.5 leading-tight">
+                    9 Maritime Close Pezula Golf Estate,<br/>
+                    Sparrebosch, Western Cape RSA 6571
+                  </p>
+                  <p className="text-[8px] font-sans text-slate-600 mt-1">
+                    W. www.tidesofknysna.online e. reservations@tidesofknysna.online WhatsApp/concierge +27812662956
+                  </p>
                 </div>
 
                 <div className="text-left sm:text-right">

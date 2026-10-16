@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Reservation, AccountingDocument, UploadedPolicyDocument } from '../types';
-import { GUEST_HOUSE_INFO, INITIAL_ACCOUNTING_DOCS, DEFAULT_ESTATE_POLICIES } from '../data/initialData';
+import { GUEST_HOUSE_INFO, INITIAL_ACCOUNTING_DOCS } from '../data/initialData';
 import { CompanyInfoData } from './CompanyInfoModule';
 import { shareDocumentViaWhatsApp } from '../services/whatsappService';
 import { addPdfWatermarkAndEmblem } from '../utils/pdfWatermarkUtils';
@@ -619,28 +619,28 @@ export const UniversalPrintHubModal: React.FC<UniversalPrintHubModalProps> = ({
             className="printable-area bg-white text-slate-900 rounded-3xl max-w-4xl w-full p-6 sm:p-10 shadow-2xl space-y-6 print:border-none print:shadow-none print:p-0 print:m-0 print:rounded-none"
           >
             {/* OFFICIAL CORPORATE LETTERHEAD HEADER */}
-            <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                {/* Official Corporate Logo */}
-                <div className="shrink-0 bg-slate-900 p-1.5 rounded-xl border border-slate-800 shadow-xs">
+            <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-xs">
                   <img 
                     src={effectiveLogo} 
                     alt={info.name || 'Tides of Knysna'} 
-                    className="h-14 sm:h-16 w-auto object-contain rounded-lg max-w-[180px] sm:max-w-[210px]"
+                    style={{ width: '38mm', height: '50mm' }}
+                    className="w-[38mm] h-[50mm] max-w-[38mm] max-h-[50mm] object-contain rounded-lg"
                   />
                 </div>
-                <div>
-                  <h1 className="font-serif-luxury text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
-                    {info.name || 'Tides of Knysna'}
-                  </h1>
-                  <p className="text-xs text-emerald-800 font-bold uppercase tracking-wider mt-0.5">
-                    {info.subTagline || info.tagline || 'EXCLUSIVE GUEST HOUSE • 5-STAR BOUTIQUE RETREAT'}
-                  </p>
-                  <div className="text-[11px] text-slate-600 mt-1 space-y-0.5">
-                    <div>Email: {info.email || GUEST_HOUSE_INFO.email} | Web: {info.webAddress || GUEST_HOUSE_INFO.webAddress}</div>
-                    <div>VAT Reg: 4890281928</div>
-                  </div>
-                </div>
+              </div>
+              <div className="text-center flex-1">
+                <h1 className="font-serif-luxury text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
+                  {info.name || 'Tides of Knysna Exclusive Guest House'}
+                </h1>
+                <p className="text-[10px] font-sans font-normal text-slate-700 mt-0.5 leading-tight">
+                  9 Maritime Close Pezula Golf Estate,<br/>
+                  Sparrebosch, Western Cape RSA 6571
+                </p>
+                <p className="text-[8px] font-sans text-slate-600 mt-1">
+                  W. www.tidesofknysna.online e. reservations@tidesofknysna.online WhatsApp/concierge +27812662956
+                </p>
               </div>
 
               <div className="text-left sm:text-right text-xs space-y-1">

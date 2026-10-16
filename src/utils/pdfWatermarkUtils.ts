@@ -2,12 +2,19 @@
  * PDF Watermark & Luxury Corporate Emblem Utility
  * Automatically injects the official Tides of Knysna secure diagonal watermark
  * and 5-star luxury gold/emerald crest emblem across all generated PDF pages.
+ * Letterhead follows exact specifications:
+ * - Logo aligned to Left of All Letterheads: 50mm high by 38mm wide
+ * - Header: 'Tides Of Knysna Exclusive Guest House' - Centre
+ * - Sub header line: '9 Maritime Close Pezula Golf Estate,' / 'Sparrebosch, Western Cape RSA 6571'
+ *   remove bold, 10pt Arial, centered over two lines
+ * - Contact line: 'W. www.tidesofknysna.online e.reservations@tidesofknysna.online WhatsApp/concierge +27812662956'
+ *   8pt Arial, centre align all
  */
 import jsPDF from 'jspdf';
 import { GUEST_HOUSE_INFO } from '../data/initialData';
 
 export function addPdfWatermarkAndEmblem(pdf: jsPDF, companyInfo?: any) {
-  const totalPages = pdf.internal.getNumberOfPages();
+  const totalPages = typeof pdf.getNumberOfPages === 'function' ? pdf.getNumberOfPages() : 1;
   const info = companyInfo || (() => {
     try {
       const saved = localStorage.getItem('tok_exclusive_company_profile_v1');
@@ -17,43 +24,66 @@ export function addPdfWatermarkAndEmblem(pdf: jsPDF, companyInfo?: any) {
   })();
 
   const logoUrl = info?.logoUrl || GUEST_HOUSE_INFO.logoUrl;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const isPt = pageWidth > 300; // true if points (e.g. 595.28 pt), false if mm (e.g. 210 mm)
+  const scale = isPt ? 2.83465 : 1; // 1mm = 2.83465 pt
+
+  const centerX = pageWidth / 2;
+  const logoWidth = 38 * scale;
+  const logoHeight = 50 * scale;
+  const logoX = (isPt ? 36 : 14);
+  const logoY = (isPt ? 20 : 7);
 
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
 
     try {
+      // Left-aligned logo (38mm wide by 50mm high)
       if (logoUrl && (logoUrl.startsWith('data:image/png') || logoUrl.startsWith('data:image/jpeg'))) {
         const format = logoUrl.includes('jpeg') || logoUrl.includes('jpg') ? 'JPEG' : 'PNG';
-        pdf.addImage(logoUrl, format, 15, 6, 28, 12);
+        pdf.addImage(logoUrl, format, logoX, logoY, logoWidth, logoHeight);
       } else {
-        // Luxury vector crest badge / emblem & company branding in header
         pdf.setDrawColor(217, 119, 6); // gold border
         pdf.setFillColor(6, 78, 59); // deep emerald fill
-        pdf.roundedRect(15, 6, 22, 14, 2, 2, 'FD');
+        pdf.roundedRect(logoX, logoY, logoWidth, logoHeight, 2 * scale, 2 * scale, 'FD');
         pdf.setTextColor(255, 255, 255);
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(9.5);
-        pdf.text('TK', 20, 15);
-
-        pdf.setTextColor(15, 23, 42);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(10.5);
-        pdf.text(info?.name || GUEST_HOUSE_INFO.name, 42, 12);
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(info?.subTagline || GUEST_HOUSE_INFO.subTagline || 'Exclusive Guest House & Luxury Estates', 42, 17);
+        pdf.setFontSize(isPt ? 11 : 8);
+        pdf.text('TK', logoX + (logoWidth / 2), logoY + (logoHeight / 2), { align: 'center' });
       }
-    } catch (e) {
-      // Fallback emblem
-      pdf.setDrawColor(217, 119, 6);
-      pdf.setFillColor(6, 78, 59);
-      pdf.roundedRect(15, 6, 22, 14, 2, 2, 'FD');
-      pdf.setTextColor(255, 255, 255);
+
+      // Header: "Tides Of Knysna Exclusive Guest House" - Centred
+      pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9.5);
-      pdf.text('TK', 20, 15);
+      pdf.setFontSize(isPt ? 14 : 11);
+      const titleY = isPt ? 32 : 12;
+      pdf.text(info?.name || 'Tides Of Knysna Exclusive Guest House', centerX, titleY, { align: 'center' });
+
+      // Sub-header line: 10pt Arial, remove bold, centered over two lines
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(isPt ? 10 : 9);
+      pdf.setTextColor(51, 65, 85); // slate-700
+      const subY1 = isPt ? 46 : 17;
+      const subY2 = isPt ? 58 : 22;
+      pdf.text('9 Maritime Close Pezula Golf Estate,', centerX, subY1, { align: 'center' });
+      pdf.text('Sparrebosch, Western Cape RSA 6571', centerX, subY2, { align: 'center' });
+
+      // Contact line: 8pt Arial, centre align all
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(isPt ? 8 : 7);
+      pdf.setTextColor(100, 116, 139); // slate-500
+      const contactY = isPt ? 70 : 27;
+      pdf.text('W. www.tidesofknysna.online e.reservations@tidesofknysna.online WhatsApp/concierge +27812662956', centerX, contactY, { align: 'center' });
+
+      // Divider line
+      pdf.setDrawColor(203, 213, 225); // slate-300
+      pdf.setLineWidth(isPt ? 0.75 : 0.3);
+      const divY = isPt ? 80 : 31;
+      pdf.line(logoX, divY, pageWidth - logoX, divY);
+
+    } catch (e) {
+      // Silently continue
     }
   }
 }

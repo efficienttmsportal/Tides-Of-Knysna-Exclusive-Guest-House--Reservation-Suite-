@@ -763,30 +763,28 @@ export const GuestFolderModule: React.FC<GuestFolderModuleProps> = ({
             className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-md space-y-6 print:border-none print:shadow-none print:p-0 print:m-0"
           >
             {/* OFFICIAL LETTERHEAD (Rendered on every printed & downloaded doc) */}
-            <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                {/* Official Corporate Logo on Stationery */}
-                <div className="shrink-0 bg-slate-900 p-1.5 rounded-xl border border-slate-800 shadow-xs">
+            <div className="border-b-2 border-slate-900 pb-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-xs">
                   <img 
                     src={companyInfo?.logoUrl || GUEST_HOUSE_INFO.logoUrl} 
                     alt={companyInfo?.name || GUEST_HOUSE_INFO.name} 
-                    className="h-14 sm:h-16 w-auto object-contain rounded-lg max-w-[180px] sm:max-w-[220px]"
+                    style={{ width: '38mm', height: '50mm' }}
+                    className="w-[38mm] h-[50mm] max-w-[38mm] max-h-[50mm] object-contain rounded-lg"
                   />
                 </div>
-                <div>
-                  <span className="font-serif-luxury font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 block">
-                    {companyInfo?.name || GUEST_HOUSE_INFO.name}
-                  </span>
-                  <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-800 block mt-0.5">
-                    {companyInfo?.subTagline || companyInfo?.tagline || 'Exclusive Guest House • 5-Star Boutique Retreat'}
-                  </span>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Email: {companyInfo?.email || GUEST_HOUSE_INFO.email} • Web: {companyInfo?.webAddress || GUEST_HOUSE_INFO.webAddress}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Concierge Mobile & WhatsApp: {dutyManagerMobile} • VAT Reg: 4890281928
-                  </p>
-                </div>
+              </div>
+              <div className="text-center flex-1">
+                <span className="font-serif-luxury font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 block">
+                  {companyInfo?.name || GUEST_HOUSE_INFO.name}
+                </span>
+                <p className="text-[10px] font-sans font-normal text-slate-700 mt-0.5 leading-tight">
+                  9 Maritime Close Pezula Golf Estate,<br/>
+                  Sparrebosch, Western Cape RSA 6571
+                </p>
+                <p className="text-[8px] font-sans text-slate-600 mt-1">
+                  W. www.tidesofknysna.online e. reservations@tidesofknysna.online WhatsApp/concierge +27812662956
+                </p>
               </div>
 
               <div className="text-left sm:text-right text-xs space-y-1">

@@ -54,6 +54,11 @@ export interface Reservation {
   documents: DocumentAttachment[];
   notes: string;
   createdAt: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  roomPinCode?: string;
+  totalAmount?: number;
+  breakageDeposit?: number;
 }
 
 export interface CheckInRecord {

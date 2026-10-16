@@ -1127,7 +1127,7 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
 
                 <button
                   type="button"
-                  onClick={handlePrintPolicy}
+                  onClick={() => handlePrintPolicy()}
                   className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto"
                   title="Print all policy records on any printer"
                 >

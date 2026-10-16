@@ -34,6 +34,7 @@ import {
 import { InventoryItem, SupplierContact } from '../types';
 import { INITIAL_SUPPLIERS } from '../data/initialData';
 import { WhatsAppIcon } from './GuestPortal';
+import { playLaserTagSound } from '../utils/audioUtils';
 
 export type InventoryQrPayloadType = 'quick_scan' | 'json' | 'web_portal';
 
@@ -174,6 +175,9 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
       }
       if (!isCancelled) {
         setBatchQrMap(newMap);
+        if (items.length > 1) {
+          playLaserTagSound();
+        }
       }
     };
 
@@ -205,7 +209,55 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
 
   // Print Action
   const handlePrint = () => {
+    playLaserTagSound();
     window.print();
+  };
+
+  // QR Data Export (CSV)
+  const handleExportQrData = () => {
+    const exportRows = items.map(item => ({
+      itemCode: item.itemCode,
+      description: item.itemDescription,
+      category: item.category,
+      location: item.location || 'Main Store',
+      onHand: item.howManyOnHand,
+      unit: item.unit,
+      whenToReorder: item.whenToReorder,
+      emergencyStockLevel: item.emergencyStockLevel ?? 'N/A',
+      supplier: item.supplier,
+      qrPayload: getPayloadString(item, activePayloadType),
+      lastExported: new Date().toISOString()
+    }));
+
+    const headers = ['Item Code', 'Description', 'Category', 'Location', 'On Hand', 'Unit', 'Reorder Level', 'Emergency Level', 'Supplier', 'QR Decoded Payload', 'Exported At'];
+    const csvContent = 'data:text/csv;charset=utf-8,' + [
+      headers.join(','),
+      ...exportRows.map(r => [
+        `"${r.itemCode}"`,
+        `"${r.description.replace(/"/g, '""')}"`,
+        `"${r.category}"`,
+        `"${r.location}"`,
+        r.onHand,
+        `"${r.unit}"`,
+        r.whenToReorder,
+        `"${r.emergencyStockLevel}"`,
+        `"${r.supplier.replace(/"/g, '""')}"`,
+        `"${r.qrPayload.replace(/"/g, '""')}"`,
+        `"${r.lastExported}"`
+      ].join(','))
+    ].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `TOK-QR-Asset-Data-Export-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    playLaserTagSound();
+    setScanNotice('✓ QR Data Export successfully generated and downloaded!');
+    setTimeout(() => setScanNotice(null), 3500);
   };
 
   // Share via WhatsApp
@@ -283,6 +335,15 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
                 QR Asset Scanner
               </button>
             </div>
+
+            <button
+              onClick={handleExportQrData}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition"
+              title="Export QR Asset Data (CSV) with decoded tags"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">QR Data Export</span>
+            </button>
 
             <button
               onClick={handlePrint}
@@ -690,8 +751,9 @@ export const InventoryQrModal: React.FC<InventoryQrModalProps> = ({
               setScannedItemId(itemId);
               setTimeout(() => {
                 setIsScanningSimulated(false);
-                setScanNotice(`Scanned & Verified tag for ${catalogPool.find(i => i.id === itemId)?.itemCode}`);
-                setTimeout(() => setScanNotice(null), 3000);
+                playLaserTagSound();
+                setScanNotice(`✓ Scanned & Verified tag for ${catalogPool.find(i => i.id === itemId)?.itemCode}`);
+                setTimeout(() => setScanNotice(null), 3500);
               }, 400);
             };
 

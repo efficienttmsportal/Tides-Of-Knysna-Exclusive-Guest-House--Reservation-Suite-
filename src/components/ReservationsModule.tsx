@@ -38,6 +38,8 @@ interface ReservationsModuleProps {
   reservations: Reservation[];
   onUpdateReservations: (updated: Reservation[]) => void;
   companyInfo?: CompanyInfoData;
+  globalCurrency?: string;
+  formatCurrency?: (amountInZar: number) => string;
 }
 
 export const ReservationsModule: React.FC<ReservationsModuleProps> = ({

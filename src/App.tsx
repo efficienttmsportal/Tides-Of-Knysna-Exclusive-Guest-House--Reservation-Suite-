@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
@@ -93,7 +93,10 @@ import {
   ClipboardCheck,
   Scale,
   Printer,
-  RotateCcw
+  RotateCcw,
+  Wifi,
+  Zap,
+  ArrowUpDown
 } from 'lucide-react';
 
 const AUDIT_STORAGE_KEY = 'tok_stock_audit_logs_v1';
@@ -1010,7 +1013,25 @@ export const App: React.FC = () => {
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('All');
   const [inventoryStockStatusFilter, setInventoryStockStatusFilter] = useState<'All' | 'LowStock' | 'Adequate'>('All');
   const [inventoryExpiryFilter, setInventoryExpiryFilter] = useState<'All' | 'Overdue' | '30Days' | '60Days' | '90Days' | '120Days'>('All');
+  const [inventoryCriticalStatusOnly, setInventoryCriticalStatusOnly] = useState<boolean>(false);
+  const [inventoryThresholdFilter, setInventoryThresholdFilter] = useState<'All' | 'Emergency' | 'NearEmergency' | 'ReorderLevel' | 'Safe' | 'SortAsc' | 'SortDesc'>('All');
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  // Column-Level Filters & Sorting states for table header
+  const [columnFilterCategory, setColumnFilterCategory] = useState<string>('All');
+  const [columnFilterSupplier, setColumnFilterSupplier] = useState<string>('All');
+  const [columnFilterLocation, setColumnFilterLocation] = useState<string>('All');
+  const [columnFilterCode, setColumnFilterCode] = useState<string>('');
+  const [columnFilterDesc, setColumnFilterDesc] = useState<string>('');
+  const [columnSortField, setColumnSortField] = useState<'itemCode' | 'itemDescription' | 'category' | 'supplier' | 'location' | 'pricePerUnit' | 'howManyOnHand' | 'whenToReorder' | null>(null);
+  const [columnSortDirection, setColumnSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Quick-Refill Modal and Submit states
+  const [quickRefillModalOpen, setQuickRefillModalOpen] = useState(false);
+  const [quickRefillItem, setQuickRefillItem] = useState<InventoryItem | null>(null);
+  const [quickRefillAmount, setQuickRefillAmount] = useState<number>(10);
+  const [quickRefillNotes, setQuickRefillNotes] = useState<string>('Standard hospitality stock replenishment to safety target');
+  const [quickRefillNotice, setQuickRefillNotice] = useState<string | null>(null);
 
   // Predictive Order Date Calculator Modal state
   const [isPredictiveCalculatorOpen, setIsPredictiveCalculatorOpen] = useState(false);
@@ -1157,8 +1178,184 @@ export const App: React.FC = () => {
     })();
 
     const matchesCritical = !inventoryCriticalStatusOnly || (item.howManyOnHand <= effectiveReorderThreshold);
-    return matchesQuery && matchesCategory && matchesStatus && matchesExpiry && matchesCritical;
+
+    // Reorder threshold filter
+    const matchesThreshold = (() => {
+      if (inventoryThresholdFilter === 'All') return true;
+      const emg = item.emergencyStockLevel ?? item.whenToReorder;
+      if (inventoryThresholdFilter === 'Emergency') return item.howManyOnHand <= emg;
+      if (inventoryThresholdFilter === 'NearEmergency') return item.howManyOnHand > emg && item.howManyOnHand <= (emg + 3);
+      if (inventoryThresholdFilter === 'ReorderLevel') return item.howManyOnHand <= item.whenToReorder;
+      if (inventoryThresholdFilter === 'Safe') return item.howManyOnHand > item.whenToReorder;
+      return true; // sorting options do not filter items out
+    })();
+
+    // Column-level header filters
+    const matchesColCategory = columnFilterCategory === 'All' || item.category === columnFilterCategory;
+    const matchesColSupplier = columnFilterSupplier === 'All' || item.supplier === columnFilterSupplier;
+    const matchesColLocation = columnFilterLocation === 'All' || (item.location || 'Main Store') === columnFilterLocation;
+    const matchesColCode = !columnFilterCode || item.itemCode.toLowerCase().includes(columnFilterCode.trim().toLowerCase());
+    const matchesColDesc = !columnFilterDesc || item.itemDescription.toLowerCase().includes(columnFilterDesc.trim().toLowerCase());
+
+    return matchesQuery && matchesCategory && matchesStatus && matchesExpiry && matchesCritical && matchesThreshold && matchesColCategory && matchesColSupplier && matchesColLocation && matchesColCode && matchesColDesc;
   });
+
+  // Sorted inventory list for column headers
+  const sortedInventory = React.useMemo(() => {
+    let list = [...filteredInventory];
+
+    if (inventoryThresholdFilter === 'SortAsc') {
+      list.sort((a, b) => {
+        const tA = a.emergencyStockLevel ?? a.whenToReorder;
+        const tB = b.emergencyStockLevel ?? b.whenToReorder;
+        return tA - tB;
+      });
+    } else if (inventoryThresholdFilter === 'SortDesc') {
+      list.sort((a, b) => {
+        const tA = a.emergencyStockLevel ?? a.whenToReorder;
+        const tB = b.emergencyStockLevel ?? b.whenToReorder;
+        return tB - tA;
+      });
+    }
+
+    if (!columnSortField) return list;
+    return list.sort((a, b) => {
+      let aVal: any = a[columnSortField];
+      let bVal: any = b[columnSortField];
+      if (columnSortField === 'location') {
+        aVal = a.location || 'Main Store';
+        bVal = b.location || 'Main Store';
+      }
+      if (typeof aVal === 'string') {
+        aVal = (aVal || '').toLowerCase();
+        bVal = (bVal || '').toLowerCase();
+        return columnSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      const numA = Number(aVal || 0);
+      const numB = Number(bVal || 0);
+      return columnSortDirection === 'asc' ? numA - numB : numB - numA;
+    });
+  }, [filteredInventory, columnSortField, columnSortDirection, inventoryThresholdFilter]);
+
+  // Unique lists for column-level filter dropdowns
+  const availableCategories = React.useMemo(() => {
+    return Array.from(new Set(inventory.map(i => i.category))).sort();
+  }, [inventory]);
+
+  const availableSuppliers = React.useMemo(() => {
+    return Array.from(new Set(inventory.map(i => i.supplier).filter(Boolean))).sort();
+  }, [inventory]);
+
+  const availableLocations = React.useMemo(() => {
+    return Array.from(new Set(inventory.map(i => i.location || 'Main Store'))).sort();
+  }, [inventory]);
+
+  const handleToggleColumnSort = (field: 'itemCode' | 'itemDescription' | 'category' | 'supplier' | 'location' | 'pricePerUnit' | 'howManyOnHand' | 'whenToReorder') => {
+    if (columnSortField === field) {
+      if (columnSortDirection === 'asc') {
+        setColumnSortDirection('desc');
+      } else {
+        setColumnSortField(null);
+        setColumnSortDirection('asc');
+      }
+    } else {
+      setColumnSortField(field);
+      setColumnSortDirection('asc');
+    }
+  };
+
+  const handleResetColumnFilters = () => {
+    setColumnFilterCategory('All');
+    setColumnFilterSupplier('All');
+    setColumnFilterLocation('All');
+    setColumnFilterCode('');
+    setColumnFilterDesc('');
+    setColumnSortField(null);
+  };
+
+  const isAnyColumnFilterActive = columnFilterCategory !== 'All' || columnFilterSupplier !== 'All' || columnFilterLocation !== 'All' || columnFilterCode !== '' || columnFilterDesc !== '' || columnSortField !== null;
+
+  // Quick-Refill Handlers
+  const handleOpenQuickRefillModal = (item?: InventoryItem | null) => {
+    setQuickRefillItem(item || null);
+    if (item) {
+      const deficit = Math.max(5, (item.emergencyStockLevel ?? item.whenToReorder) - item.howManyOnHand + 10);
+      setQuickRefillAmount(deficit);
+      setQuickRefillNotes(`Quick-Refill: replenishing deficit + safety buffer (+${deficit} ${item.unit})`);
+    } else {
+      setQuickRefillAmount(15);
+      setQuickRefillNotes(`Batch Quick-Refill: +15 units across ${selectedItemIds.length || filteredInventory.length} items`);
+    }
+    setQuickRefillModalOpen(true);
+  };
+
+  const handleSubmitQuickRefill = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (quickRefillAmount <= 0) return;
+
+    playLaserTagSound();
+
+    if (quickRefillItem) {
+      // Single Item Quick-Refill
+      const prev = quickRefillItem.howManyOnHand;
+      const next = prev + quickRefillAmount;
+
+      setInventory(prevInv => prevInv.map(i => i.id === quickRefillItem.id ? {
+        ...i,
+        howManyOnHand: next,
+        lastRestocked: new Date().toISOString().split('T')[0]
+      } : i));
+
+      appendAuditLog({
+        itemId: quickRefillItem.id,
+        itemCode: quickRefillItem.itemCode,
+        itemDescription: quickRefillItem.itemDescription,
+        previousQty: prev,
+        newQty: next,
+        deltaQty: quickRefillAmount,
+        adjustedBy: currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Eleanor Sterling (Head of Ops)',
+        actionType: 'Quick-Refill Replenishment',
+        notes: quickRefillNotes || `Quick-Refill submitted: +${quickRefillAmount} ${quickRefillItem.unit}`
+      });
+
+      setQuickRefillNotice(`Successfully refilled ${quickRefillItem.itemCode} by +${quickRefillAmount} units (Now: ${next}).`);
+    } else {
+      // Batch Quick-Refill
+      const targetIds = selectedItemIds.length > 0 ? selectedItemIds : filteredInventory.map(i => i.id);
+      const count = targetIds.length;
+
+      setInventory(prevInv => prevInv.map(i => {
+        if (targetIds.includes(i.id)) {
+          const prev = i.howManyOnHand;
+          const next = prev + quickRefillAmount;
+
+          appendAuditLog({
+            itemId: i.id,
+            itemCode: i.itemCode,
+            itemDescription: i.itemDescription,
+            previousQty: prev,
+            newQty: next,
+            deltaQty: quickRefillAmount,
+            adjustedBy: currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Eleanor Sterling (Head of Ops)',
+            actionType: 'Batch Quick-Refill Replenishment',
+            notes: quickRefillNotes || `Batch Quick-Refill submitted: +${quickRefillAmount} ${i.unit}`
+          });
+
+          return {
+            ...i,
+            howManyOnHand: next,
+            lastRestocked: new Date().toISOString().split('T')[0]
+          };
+        }
+        return i;
+      }));
+
+      setQuickRefillNotice(`Successfully applied Quick-Refill (+${quickRefillAmount} units) across ${count} items.`);
+    }
+
+    setQuickRefillModalOpen(false);
+    setTimeout(() => setQuickRefillNotice(null), 4000);
+  };
 
   // Export to CSV helper
   const handleExportInventoryCsv = () => {
@@ -1307,8 +1504,77 @@ export const App: React.FC = () => {
     return `${symbol} ${converted.toLocaleString('en-US', { minimumFractionDigits: globalCurrency === 'JPY' ? 0 : 2, maximumFractionDigits: globalCurrency === 'JPY' ? 0 : 2 })}`;
   };
 
-  // Critical Status Toggle State
-  const [inventoryCriticalStatusOnly, setInventoryCriticalStatusOnly] = useState<boolean>(false);
+
+  // Printer Simulation, Glow-pulse border animation & Print Batch menu states
+  const [printerConnectionStage, setPrinterConnectionStage] = useState<'idle' | 'connecting' | 'loading' | 'success'>('idle');
+  const [activePrinterTarget, setActivePrinterTarget] = useState<'scanner' | 'quick' | 'batch' | null>(null);
+  const [isPrintBatchMenuOpen, setIsPrintBatchMenuOpen] = useState(false);
+  const printBatchMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close Print Batch menu on click outside
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (printBatchMenuRef.current && !printBatchMenuRef.current.contains(event.target as Node)) {
+        setIsPrintBatchMenuOpen(false);
+      }
+    };
+    if (isPrintBatchMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isPrintBatchMenuOpen]);
+
+  const playLaserTagSound = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch (e) {}
+  };
+
+  // Trigger printer connection glow-pulse handshake, spooling loader, and completion
+  const triggerPrinterWorkflow = (
+    target: 'scanner' | 'quick' | 'batch',
+    onComplete: () => void
+  ) => {
+    setActivePrinterTarget(target);
+    setPrinterConnectionStage('connecting'); // Step 1: Glow-pulse border connection handshake
+
+    setTimeout(() => {
+      setPrinterConnectionStage('loading'); // Step 2: Spooling / Loading spinner
+
+      setTimeout(() => {
+        setPrinterConnectionStage('success'); // Step 3: Success checkmark & audio cue
+        playLaserTagSound();
+        onComplete();
+
+        setTimeout(() => {
+          setPrinterConnectionStage('idle');
+          setActivePrinterTarget(null);
+        }, 1600);
+      }, 550);
+    }, 450);
+  };
+
+  const handleQuickQrPrint = () => {
+    triggerPrinterWorkflow('quick', () => {
+      setQrModalItems(selectedItemIds.length > 0 ? inventory.filter(i => selectedItemIds.includes(i.id)) : filteredInventory.slice(0, 10));
+      setQrModalInitialMode('sheet');
+    });
+  };
 
   // Batch Undo Handler
   const handleBatchUndo = () => {
@@ -1318,7 +1584,7 @@ export const App: React.FC = () => {
 
     const updated = inventory.map(item => {
       if (selectedItemIds.includes(item.id)) {
-        const lastLog = stockAuditLog.find(log => log.itemId === item.id);
+        const lastLog = stockAuditLogs.find(log => log.itemId === item.id);
         if (lastLog) {
           revertedCount++;
           const prevQty = lastLog.previousQty;
@@ -1586,7 +1852,7 @@ export const App: React.FC = () => {
     const count = selectedItemIds.length;
     setInventory(prev => prev.map(item => {
       if (selectedItemIds.includes(item.id)) {
-        const threshold = item.reorderThreshold ?? 5;
+        const threshold = item.whenToReorder ?? 5;
         const diff = Math.max(0, threshold - item.howManyOnHand);
         const addAmount = diff > 0 ? diff : 10;
         return {
@@ -2112,29 +2378,281 @@ export const App: React.FC = () => {
                     Predictive Order Date Calculator
                   </button>
 
+                  {/* QR Asset Scanner Button with subtle deep-emerald border, refined shadow, hover-pulse scale, glow-pulse printer handshake and spinner */}
                   <button
-                    onClick={() => {
-                      setAuditLogFilterItemId(null);
-                      setIsAuditLogOpen(true);
+                    onClick={(e) => {
+                      if (e.shiftKey) {
+                        triggerPrinterWorkflow('scanner', () => {
+                          setQrModalItems(filteredInventory);
+                          setQrModalInitialMode('sheet');
+                        });
+                      } else {
+                        triggerPrinterWorkflow('scanner', () => {
+                          setQrModalItems(filteredInventory);
+                          setQrModalInitialMode('scanner');
+                        });
+                      }
                     }}
-                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
-                    title="Open Stock Audit Log to review historical adjustments and changes"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      triggerPrinterWorkflow('scanner', () => {
+                        setQrModalItems(filteredInventory);
+                        setQrModalInitialMode('sheet');
+                      });
+                    }}
+                    className={`px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 border transition duration-300 relative shadow-md shadow-emerald-950/20 ${
+                      activePrinterTarget === 'scanner' && printerConnectionStage === 'connecting'
+                        ? 'border-emerald-400 ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900 shadow-[0_0_25px_rgba(52,211,153,0.95)] animate-pulse scale-105'
+                        : activePrinterTarget === 'scanner' && printerConnectionStage === 'loading'
+                        ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.5)]'
+                        : 'border-emerald-600/70 hover:border-emerald-400 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    }`}
+                    title="Click for QR Scanner (Shift+Click or Right-Click for Batch QR Sheet Print)"
                   >
-                    <History className="w-3.5 h-3.5 text-indigo-600" />
-                    Stock Audit Log ({stockAuditLogs.length})
+                    {activePrinterTarget === 'scanner' && printerConnectionStage === 'connecting' ? (
+                      <Wifi className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                    ) : activePrinterTarget === 'scanner' && printerConnectionStage === 'loading' ? (
+                      <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                    ) : activePrinterTarget === 'scanner' && printerConnectionStage === 'success' ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
+                    ) : (
+                      <QrIcon className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span>
+                      {activePrinterTarget === 'scanner' && printerConnectionStage === 'connecting'
+                        ? 'Connecting Printer...'
+                        : activePrinterTarget === 'scanner' && printerConnectionStage === 'loading'
+                        ? 'Spooling...'
+                        : 'QR Asset Scanner'}
+                    </span>
+                    {activePrinterTarget === 'scanner' && printerConnectionStage === 'success' && (
+                      <span className="absolute -top-2 -right-2 bg-emerald-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow animate-pulse">
+                        ✓ SCANNED
+                      </span>
+                    )}
                   </button>
 
+                  {/* Quick-QR Print Button with subtle deep-emerald border, refined shadow, hover-pulse scale and spinner */}
+                  <button
+                    onClick={handleQuickQrPrint}
+                    className={`px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 border transition duration-300 relative shadow-md shadow-emerald-950/20 ${
+                      activePrinterTarget === 'quick' && printerConnectionStage === 'connecting'
+                        ? 'border-emerald-300 ring-2 ring-emerald-300 ring-offset-2 ring-offset-slate-900 shadow-[0_0_25px_rgba(110,231,183,0.95)] animate-pulse scale-105'
+                        : activePrinterTarget === 'quick' && printerConnectionStage === 'loading'
+                        ? 'border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)]'
+                        : 'border-emerald-600/70 hover:border-emerald-400 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    }`}
+                    title="Quick-QR Print: Instant QR tags sheet for current selection or items"
+                  >
+                    {activePrinterTarget === 'quick' && printerConnectionStage === 'connecting' ? (
+                      <Wifi className="w-3.5 h-3.5 text-emerald-100 animate-pulse" />
+                    ) : activePrinterTarget === 'quick' && printerConnectionStage === 'loading' ? (
+                      <RefreshCw className="w-3.5 h-3.5 text-emerald-100 animate-spin" />
+                    ) : activePrinterTarget === 'quick' && printerConnectionStage === 'success' ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-white animate-bounce" />
+                    ) : (
+                      <Printer className="w-3.5 h-3.5 text-emerald-200" />
+                    )}
+                    <span>
+                      {activePrinterTarget === 'quick' && printerConnectionStage === 'connecting'
+                        ? 'Connecting Printer...'
+                        : activePrinterTarget === 'quick' && printerConnectionStage === 'loading'
+                        ? 'Spooling...'
+                        : 'Quick-QR Print'}
+                    </span>
+                    {activePrinterTarget === 'quick' && printerConnectionStage === 'success' && (
+                      <span className="absolute -top-2 -right-2 bg-emerald-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow animate-pulse">
+                        ✓ PRINTING
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Batch Generate QR Button */}
                   <button
                     onClick={() => {
-                      setQrModalItems(filteredInventory);
-                      setQrModalInitialMode('scanner');
+                      triggerPrinterWorkflow('batch', () => {
+                        setQrModalItems(filteredInventory);
+                        setQrModalInitialMode('sheet');
+                      });
                     }}
-                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
-                    title="Open QR Asset Scanner & Tag Generator"
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/20 border border-emerald-600/70 hover:border-emerald-400 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] transition duration-300"
+                    title="Batch Generate QR: Filter items by location or category and generate/print a sheet of QR asset tags for all items in filtered set"
                   >
                     <QrIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    QR Asset Scanner
+                    <span>Batch Generate QR ({filteredInventory.length})</span>
                   </button>
+
+                  {/* QR Scan-All Mode Button */}
+                  <button
+                    onClick={() => {
+                      triggerPrinterWorkflow('scanner', () => {
+                        setQrModalItems(filteredInventory);
+                        setQrModalInitialMode('scanner');
+                      });
+                    }}
+                    className="px-3 py-1.5 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md border border-emerald-700/60 hover:scale-105 hover:shadow-[0_0_18px_rgba(16,185,129,0.4)] transition duration-300"
+                    title="Launch continuous QR 'Scan-All' Mode for rapid shelf bin auditing with audio cues"
+                  >
+                    <Scan className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>QR Scan-All Mode</span>
+                  </button>
+
+                  {/* 'Print Batch' Menu */}
+                  <div className="relative inline-block" ref={printBatchMenuRef}>
+                    <button
+                      onClick={() => setIsPrintBatchMenuOpen(prev => !prev)}
+                      className={`px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-100 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md border transition duration-300 relative ${
+                        activePrinterTarget === 'batch' && printerConnectionStage === 'connecting'
+                          ? 'border-emerald-400 ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900 shadow-[0_0_25px_rgba(52,211,153,0.95)] animate-pulse scale-105'
+                          : activePrinterTarget === 'batch' && printerConnectionStage === 'loading'
+                          ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.5)]'
+                          : 'border-slate-700/80 hover:border-emerald-500/70 hover:scale-105 hover:shadow-[0_0_18px_rgba(16,185,129,0.4)]'
+                      }`}
+                      title="Open Print Batch Menu for high-volume inventory tag generation"
+                    >
+                      {activePrinterTarget === 'batch' && printerConnectionStage === 'connecting' ? (
+                        <Wifi className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                      ) : activePrinterTarget === 'batch' && printerConnectionStage === 'loading' ? (
+                        <RefreshCw className="w-3.5 h-3.5 text-emerald-300 animate-spin" />
+                      ) : activePrinterTarget === 'batch' && printerConnectionStage === 'success' ? (
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
+                      ) : (
+                        <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                      )}
+                      <span>
+                        {activePrinterTarget === 'batch' && printerConnectionStage === 'connecting'
+                          ? 'Connecting...'
+                          : activePrinterTarget === 'batch' && printerConnectionStage === 'loading'
+                          ? 'Spooling Batch...'
+                          : 'Print Batch'}
+                      </span>
+                      <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isPrintBatchMenuOpen ? 'rotate-180' : ''}`} />
+                      {activePrinterTarget === 'batch' && printerConnectionStage === 'success' && (
+                        <span className="absolute -top-2 -right-2 bg-emerald-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow animate-pulse">
+                          ✓ BATCH READY
+                        </span>
+                      )}
+                    </button>
+
+                    {isPrintBatchMenuOpen && (
+                      <div className="absolute right-0 sm:left-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 p-2 space-y-1 text-xs">
+                        <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between">
+                          <span>Print Batch Menu</span>
+                          <span className="text-slate-400 font-mono text-[9px]">Thermal & Laser</span>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setIsPrintBatchMenuOpen(false);
+                            triggerPrinterWorkflow('batch', () => {
+                              setQrModalItems(filteredInventory);
+                              setQrModalInitialMode('sheet');
+                            });
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl flex items-center justify-between text-slate-200 hover:text-white transition group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Printer className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                            <div>
+                              <div className="font-bold">Print Current Filtered Set</div>
+                              <div className="text-[10px] text-slate-400">All matching table results</div>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 rounded-full font-mono text-[10px] border border-emerald-800/60 font-bold">
+                            {filteredInventory.length} tags
+                          </span>
+                        </button>
+
+                        <button
+                          disabled={selectedItemIds.length === 0}
+                          onClick={() => {
+                            if (selectedItemIds.length === 0) return;
+                            setIsPrintBatchMenuOpen(false);
+                            triggerPrinterWorkflow('batch', () => {
+                              const selected = inventory.filter(i => selectedItemIds.includes(i.id));
+                              setQrModalItems(selected);
+                              setQrModalInitialMode('sheet');
+                            });
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition ${
+                            selectedItemIds.length === 0
+                              ? 'opacity-40 cursor-not-allowed text-slate-500'
+                              : 'hover:bg-slate-800 text-slate-200 hover:text-white group'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <CheckSquare className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                            <div>
+                              <div className="font-bold">Print Selected Items Only</div>
+                              <div className="text-[10px] text-slate-400">Multi-checked inventory rows</div>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 rounded-full font-mono text-[10px] border border-indigo-800/60 font-bold">
+                            {selectedItemIds.length} tags
+                          </span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsPrintBatchMenuOpen(false);
+                            const urgent = filteredInventory.filter(i => i.howManyOnHand <= (i.emergencyStockLevel ?? i.whenToReorder));
+                            triggerPrinterWorkflow('batch', () => {
+                              setQrModalItems(urgent.length > 0 ? urgent : filteredInventory);
+                              setQrModalInitialMode('sheet');
+                            });
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl flex items-center justify-between text-slate-200 hover:text-white transition group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                            <div>
+                              <div className="font-bold">Print Low Stock / Reorder Batch</div>
+                              <div className="text-[10px] text-slate-400">Items below reorder limit</div>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 bg-amber-950 text-amber-300 rounded-full font-mono text-[10px] border border-amber-800/60 font-bold">
+                            {filteredInventory.filter(i => i.howManyOnHand <= (i.emergencyStockLevel ?? i.whenToReorder)).length} tags
+                          </span>
+                        </button>
+
+                        <div className="border-t border-slate-800 pt-1 mt-1">
+                          <button
+                            onClick={() => {
+                              setIsPrintBatchMenuOpen(false);
+                              triggerPrinterWorkflow('batch', () => {
+                                setQrModalItems(filteredInventory);
+                                setQrModalInitialMode('sheet');
+                              });
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl flex items-center justify-between text-slate-300 hover:text-white transition text-[11px]"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                              Thermal 50x30mm Roll Format
+                            </span>
+                            <span className="text-[10px] text-emerald-400 font-bold">Direct Spool</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setIsPrintBatchMenuOpen(false);
+                              triggerPrinterWorkflow('batch', () => {
+                                setQrModalItems(filteredInventory);
+                                setQrModalInitialMode('sheet');
+                              });
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl flex items-center justify-between text-slate-300 hover:text-white transition text-[11px]"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                              A4 Adhesive Sheet (24-up)
+                            </span>
+                            <span className="text-[10px] text-sky-400 font-bold">Laser / Inkjet</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => {
@@ -2249,6 +2767,30 @@ export const App: React.FC = () => {
                       <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
                       Critical Status ({inventory.filter(i => i.howManyOnHand <= i.whenToReorder).length})
                     </button>
+
+                    {/* Reorder Threshold Filter Dropdown */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <select
+                        value={inventoryThresholdFilter}
+                        onChange={(e) => setInventoryThresholdFilter(e.target.value as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none shadow-xs transition cursor-pointer ${
+                          inventoryThresholdFilter !== 'All'
+                            ? inventoryThresholdFilter.includes('Emergency')
+                              ? 'bg-rose-100 border-rose-400 text-rose-900 ring-2 ring-rose-400/50'
+                              : 'bg-amber-100 border-amber-400 text-amber-900'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                        title="Filter and sort inventory by reorder threshold limits"
+                      >
+                        <option value="All">All Threshold Limits</option>
+                        <option value="Emergency">🚨 Emergency Stock Limit (≤ Emergency Limit)</option>
+                        <option value="NearEmergency">⚠️ Near Emergency Limit (≤ Limit + 3)</option>
+                        <option value="ReorderLevel">📉 Standard Reorder Alert (≤ Reorder Limit)</option>
+                        <option value="Safe">✅ Safe Buffer Above Reorder</option>
+                        <option value="SortAsc">↕️ Sort: Emergency Limit (Ascending)</option>
+                        <option value="SortDesc">↕️ Sort: Reorder Threshold (Descending)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -2279,17 +2821,22 @@ export const App: React.FC = () => {
                   >
                     <span>↕️ {isRowHeightened ? 'Compact Rows' : 'Heighten Rows'}</span>
                   </button>
-                  {(inventorySearchQuery || inventoryCategoryFilter !== 'All' || inventoryStockStatusFilter !== 'All' || inventoryExpiryFilter !== 'All') && (
+                  {(inventorySearchQuery || inventoryCategoryFilter !== 'All' || inventoryStockStatusFilter !== 'All' || inventoryExpiryFilter !== 'All' || inventoryThresholdFilter !== 'All') && (
                     <button
                       onClick={() => {
                         setInventorySearchQuery('');
                         setInventoryCategoryFilter('All');
                         setInventoryStockStatusFilter('All');
                         setInventoryExpiryFilter('All');
+                        setInventoryThresholdFilter('All');
                       }}
                       className="ml-auto text-slate-500 hover:text-slate-800 font-bold flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-200 transition shrink-0"
                     >
                       <RefreshCw className="w-3 h-3" />
+                      Reset Filters
+                    </button>
+                  )}
+                </div>
                       Reset Filters
                     </button>
                   )}
@@ -2547,6 +3094,16 @@ export const App: React.FC = () => {
                       Safety Buffer Restock
                     </button>
 
+                    {/* Quick-Refill Submit Button */}
+                    <button
+                      onClick={() => handleOpenQuickRefillModal(null)}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md border border-amber-300/40 transition hover:scale-105 duration-200"
+                      title="Open Quick-Refill Submit tool for selected items"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-200" />
+                      <span>Quick-Refill Submit</span>
+                    </button>
+
                     {/* Batch QR Generator */}
                     <button
                       onClick={handleOpenBatchQrModal}
@@ -2588,29 +3145,173 @@ export const App: React.FC = () => {
                       <th className="px-3 py-2.5 w-10 text-center">
                         <input
                           type="checkbox"
-                          checked={filteredInventory.length > 0 && filteredInventory.every(i => selectedItemIds.includes(i.id))}
+                          checked={sortedInventory.length > 0 && sortedInventory.every(i => selectedItemIds.includes(i.id))}
                           onChange={handleSelectAllVisible}
                           className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                           title="Select / Deselect all visible items"
                         />
                       </th>
-                      <th className="px-3 py-2.5">Item Code</th>
-                      <th className="px-3 py-2.5">Description</th>
-                      <th className="px-3 py-2.5">Category</th>
-                      <th className="px-3 py-2.5">Supplier</th>
-                      <th className="px-3 py-2.5">Location</th>
-                      <th className="px-3 py-2.5">Price / Unit</th>
-                      <th className="px-3 py-2.5">On Hand</th>
-                      <th className="px-3 py-2.5">Reorder Level</th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('itemCode')}>
+                        <div className="flex items-center gap-1">
+                          <span>Item Code</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'itemCode' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('itemDescription')}>
+                        <div className="flex items-center gap-1">
+                          <span>Description</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'itemDescription' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('category')}>
+                        <div className="flex items-center gap-1">
+                          <span>Category</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'category' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('supplier')}>
+                        <div className="flex items-center gap-1">
+                          <span>Supplier</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'supplier' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('location')}>
+                        <div className="flex items-center gap-1">
+                          <span>Location</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'location' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('pricePerUnit')}>
+                        <div className="flex items-center gap-1">
+                          <span>Price / Unit</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'pricePerUnit' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('howManyOnHand')}>
+                        <div className="flex items-center gap-1">
+                          <span>On Hand</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'howManyOnHand' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
+                      <th className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 select-none transition" onClick={() => handleToggleColumnSort('whenToReorder')}>
+                        <div className="flex items-center gap-1">
+                          <span>Reorder Level</span>
+                          <ArrowUpDown className={`w-3 h-3 ${columnSortField === 'whenToReorder' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`} />
+                        </div>
+                      </th>
                       <th className="px-3 py-2.5 min-w-[210px]">Notes / Notas</th>
-                      <th className="px-3 py-2.5">Adjust Stock</th>
+                      <th className="px-3 py-2.5 text-center">Quick-Refill / Adjust</th>
                       <th className="px-3 py-2.5 text-center">Audit</th>
                       <th className="px-3 py-2.5 text-center">QR Tag</th>
                       <th className="px-3 py-2.5">Status</th>
                     </tr>
+
+                    {/* Column-level interactive filter controls row */}
+                    <tr className="bg-slate-100/95 border-t border-b border-slate-200 normal-case font-normal text-slate-700">
+                      <th className="px-2 py-1.5 text-center">
+                        {isAnyColumnFilterActive ? (
+                          <button
+                            onClick={handleResetColumnFilters}
+                            title="Reset all column filters and sorting"
+                            className="p-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg transition"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        ) : (
+                          <Filter className="w-3 h-3 text-slate-400 mx-auto" />
+                        )}
+                      </th>
+                      <th className="px-2 py-1">
+                        <input
+                          type="text"
+                          placeholder="Code..."
+                          value={columnFilterCode}
+                          onChange={(e) => setColumnFilterCode(e.target.value)}
+                          className="w-full px-2 py-1 text-[11px] bg-white border border-slate-200 rounded-lg font-normal outline-none focus:border-emerald-500 shadow-xs"
+                        />
+                      </th>
+                      <th className="px-2 py-1">
+                        <input
+                          type="text"
+                          placeholder="Description..."
+                          value={columnFilterDesc}
+                          onChange={(e) => setColumnFilterDesc(e.target.value)}
+                          className="w-full px-2 py-1 text-[11px] bg-white border border-slate-200 rounded-lg font-normal outline-none focus:border-emerald-500 shadow-xs"
+                        />
+                      </th>
+                      <th className="px-2 py-1">
+                        <select
+                          value={columnFilterCategory}
+                          onChange={(e) => setColumnFilterCategory(e.target.value)}
+                          className={`w-full px-2 py-1 text-[11px] rounded-lg border font-medium outline-none shadow-xs transition ${
+                            columnFilterCategory !== 'All'
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="All">All Categories ({availableCategories.length})</option>
+                          {availableCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </th>
+                      <th className="px-2 py-1">
+                        <select
+                          value={columnFilterSupplier}
+                          onChange={(e) => setColumnFilterSupplier(e.target.value)}
+                          className={`w-full px-2 py-1 text-[11px] rounded-lg border font-medium outline-none shadow-xs transition ${
+                            columnFilterSupplier !== 'All'
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="All">All Suppliers ({availableSuppliers.length})</option>
+                          {availableSuppliers.map(sup => (
+                            <option key={sup} value={sup}>{sup}</option>
+                          ))}
+                        </select>
+                      </th>
+                      <th className="px-2 py-1">
+                        <select
+                          value={columnFilterLocation}
+                          onChange={(e) => setColumnFilterLocation(e.target.value)}
+                          className={`w-full px-2 py-1 text-[11px] rounded-lg border font-medium outline-none shadow-xs transition ${
+                            columnFilterLocation !== 'All'
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="All">All Locations ({availableLocations.length})</option>
+                          {availableLocations.map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      </th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">
+                        {columnSortField === 'pricePerUnit' ? (columnSortDirection === 'asc' ? 'Low → High' : 'High → Low') : '-'}
+                      </th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">
+                        {columnSortField === 'howManyOnHand' ? (columnSortDirection === 'asc' ? 'Min → Max' : 'Max → Min') : '-'}
+                      </th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">-</th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">-</th>
+                      <th className="px-2 py-1 text-center">
+                        <button
+                          onClick={() => handleOpenQuickRefillModal(null)}
+                          className="px-2 py-1 text-[10px] bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white rounded-lg font-bold flex items-center justify-center gap-1 transition shadow-xs w-full"
+                          title="Open Quick-Refill Submit window for visible items"
+                        >
+                          <Zap className="w-3 h-3 text-amber-200" />
+                          <span>Quick-Refill</span>
+                        </button>
+                      </th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">-</th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">-</th>
+                      <th className="px-2 py-1 text-slate-400 text-[10px] text-center font-normal">-</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredInventory.length === 0 ? (
+                    {sortedInventory.length === 0 ? (
                       <tr>
                         <td colSpan={14} className="px-4 py-8 text-center text-slate-400 text-xs">
                           <Search className="w-6 h-6 mx-auto text-slate-300 mb-2" />
@@ -2622,6 +3323,7 @@ export const App: React.FC = () => {
                               setInventoryCategoryFilter('All');
                               setInventoryStockStatusFilter('All');
                               setInventoryExpiryFilter('All');
+                              handleResetColumnFilters();
                             }}
                             className="mt-2.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs inline-flex items-center gap-1 transition"
                           >
@@ -2631,7 +3333,7 @@ export const App: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredInventory.map(item => {
+                      sortedInventory.map(item => {
                         const isLow = item.howManyOnHand <= item.whenToReorder;
                         const isSelected = selectedItemIds.includes(item.id);
                         const priority = item.priority || 'Medium';
@@ -2874,6 +3576,15 @@ export const App: React.FC = () => {
                                   title="Replenish +10"
                                 >
                                   +10
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenQuickRefillModal(item)}
+                                  className="px-2 h-6 text-[10px] rounded-md bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold flex items-center gap-1 transition shadow-2xs shrink-0"
+                                  title={`Quick-Refill ${item.itemCode}: Open instant replenishment submit`}
+                                >
+                                  <Zap className="w-2.5 h-2.5 text-amber-200" />
+                                  <span>Quick-Refill</span>
                                 </button>
                                 <div className="relative group/priority flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
                                   <span className="text-[10px] font-bold text-slate-500 uppercase">Priority:</span>
@@ -4492,6 +5203,156 @@ export const App: React.FC = () => {
                 Save Threshold & Pricing
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK-REFILL SUBMIT MODAL */}
+      {quickRefillModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-600 text-white flex items-center justify-center shadow-md">
+                  <Zap className="w-5 h-5 text-amber-100 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-serif-luxury font-bold text-slate-900 text-lg">
+                    ⚡ Quick-Refill Submit Tool
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {quickRefillItem 
+                      ? `${quickRefillItem.itemCode} • ${quickRefillItem.itemDescription}`
+                      : `Batch Refill: ${selectedItemIds.length || filteredInventory.length} items targeted`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickRefillModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitQuickRefill} className="space-y-4 text-xs">
+              {quickRefillItem && (
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Current Stock</span>
+                    <strong className="text-slate-800 text-sm font-extrabold">{quickRefillItem.howManyOnHand} {quickRefillItem.unit}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Reorder Trigger</span>
+                    <strong className="text-amber-700 text-sm font-extrabold">{quickRefillItem.emergencyStockLevel ?? quickRefillItem.whenToReorder} {quickRefillItem.unit}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold">New Balance</span>
+                    <strong className="text-emerald-700 text-sm font-extrabold">{quickRefillItem.howManyOnHand + quickRefillAmount} {quickRefillItem.unit}</strong>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Presets */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[10px] tracking-wider">
+                  Preset Refill Quantities
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[5, 10, 25, 50].map(qty => (
+                    <button
+                      key={qty}
+                      type="button"
+                      onClick={() => setQuickRefillAmount(qty)}
+                      className={`py-2 px-2.5 rounded-xl font-bold text-xs transition border flex items-center justify-center gap-1 ${
+                        quickRefillAmount === qty
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <Plus className="w-3 h-3 text-emerald-300" />
+                      +{qty}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Amount Input with +/- */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1 uppercase text-[10px] tracking-wider">
+                  Custom Refill Amount (Units)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickRefillAmount(prev => Math.max(1, prev - 1))}
+                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-lg flex items-center justify-center transition border border-slate-200"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={quickRefillAmount}
+                    onChange={(e) => setQuickRefillAmount(Math.max(1, Number(e.target.value)))}
+                    className="flex-1 text-center font-black text-lg py-1.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQuickRefillAmount(prev => prev + 1)}
+                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-lg flex items-center justify-center transition border border-slate-200"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Notes / Reason */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1 uppercase text-[10px] tracking-wider">
+                  Audit Log Reason / Storage Bay Note
+                </label>
+                <input
+                  type="text"
+                  value={quickRefillNotes}
+                  onChange={(e) => setQuickRefillNotes(e.target.value)}
+                  placeholder="e.g. Received new shipment from vendor, restocked hospitality pantry"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-800"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickRefillModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-xs transition shadow-lg hover:shadow-emerald-500/25 flex items-center gap-1.5"
+                >
+                  <Zap className="w-4 h-4 text-amber-300" />
+                  <span>Submit Quick-Refill (+{quickRefillAmount} Units)</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Quick-Refill Confirmation Toast */}
+      {quickRefillNotice && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white border border-emerald-500 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-fade-in no-print">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <Zap className="w-4 h-4 text-amber-300 animate-pulse" />
+          </div>
+          <div>
+            <div className="font-bold text-xs text-white">Stock Replenishment Confirmed</div>
+            <div className="text-[11px] text-emerald-300">{quickRefillNotice}</div>
           </div>
         </div>
       )}

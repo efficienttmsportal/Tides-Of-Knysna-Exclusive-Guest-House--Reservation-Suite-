@@ -49,6 +49,7 @@ import { InventoryItem, Reservation } from '../types';
 import { CompanyInfoData } from './CompanyInfoModule';
 import { GUEST_HOUSE_INFO, INITIAL_SUPPLIERS } from '../data/initialData';
 import { getStoredGuestSurveys, GuestSatisfactionRecord } from './GuestSatisfactionSurvey';
+import { calculateOrderDate } from '../utils/predictiveOrderCalculator';
 
 interface InventoryForecastingModuleProps {
   inventory: InventoryItem[];
@@ -57,7 +58,7 @@ interface InventoryForecastingModuleProps {
   companyInfo?: CompanyInfoData;
   onOpenAccounting?: () => void;
   onOpenSupplierModal?: (supplierName: string) => void;
-  initialTab?: 'forecast' | 'feedback_correlator' | 'po_preview';
+  initialTab?: 'forecast' | 'expiry' | 'feedback_correlator' | 'po_preview';
 }
 
 export type ForecastHorizon = 7 | 14 | 30 | 60 | 90;
@@ -103,7 +104,7 @@ export const InventoryForecastingModule: React.FC<InventoryForecastingModuleProp
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [reorderSuccessMsg, setReorderSuccessMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'forecast' | 'feedback_correlator' | 'po_preview'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'forecast' | 'expiry' | 'feedback_correlator' | 'po_preview'>(initialTab);
 
   React.useEffect(() => {
     if (initialTab) {
@@ -653,6 +654,21 @@ export const InventoryForecastingModule: React.FC<InventoryForecastingModuleProp
         </button>
 
         <button
+          onClick={() => setActiveTab('expiry')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shrink-0 ${
+            activeTab === 'expiry'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-amber-400" />
+          Expiry Forecast & Smart Replenishment
+          <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">
+            Smart Replenishment
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('feedback_correlator')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shrink-0 ${
             activeTab === 'feedback_correlator'
@@ -1076,6 +1092,199 @@ export const InventoryForecastingModule: React.FC<InventoryForecastingModuleProp
                     </div>
                   </div>
                 ))}
+            </div>
+      {/* ========================================================================= */}
+      {/* TAB 4: EXPIRY FORECAST & SMART REPLENISHMENT CALCULATOR                   */}
+      {/* ========================================================================= */}
+      {activeTab === 'expiry' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif-luxury font-bold text-lg text-white">
+                      Expiry Forecast & Smart Replenishment Engine
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      Predicts optimal reorder batches based on 30-day moving average consumption rates, supplier lead times, and shelf-life limits.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Smart Buffer Calibrated (45d Runway)
+                </span>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+              <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Overdue Expiries</span>
+                <span className="text-xl font-black text-rose-400 font-mono">
+                  {inventory.filter(i => {
+                    if (!i.expiryDate) return false;
+                    return new Date(i.expiryDate) < new Date();
+                  }).length} items
+                </span>
+              </div>
+              <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Expiring Next 60d</span>
+                <span className="text-xl font-black text-amber-400 font-mono">
+                  {inventory.filter(i => {
+                    if (!i.expiryDate) return false;
+                    const diff = (new Date(i.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+                    return diff >= 0 && diff <= 60;
+                  }).length} items
+                </span>
+              </div>
+              <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Avg Supplier Lead Time</span>
+                <span className="text-xl font-black text-sky-400 font-mono">
+                  {(inventory.reduce((acc, i) => acc + (calculateOrderDate(i).leadTimeDays), 0) / (inventory.length || 1)).toFixed(1)} Days
+                </span>
+              </div>
+              <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Smart Reorder Need</span>
+                <span className="text-xl font-black text-emerald-400 font-mono">
+                  {inventory.filter(i => i.howManyOnHand <= (i.emergencyStockLevel ?? i.whenToReorder)).length} Items
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Expiry & Smart Replenishment Table */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  Item Shelf-Life & Smart Suggested Order Quantities
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Calculated against current on-hand levels, lead times, and continuous 30-day burn averages.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2.5">Item Code</th>
+                    <th className="px-3 py-2.5">Description</th>
+                    <th className="px-3 py-2.5">Category</th>
+                    <th className="px-3 py-2.5">Expiry Date</th>
+                    <th className="px-3 py-2.5">On Hand</th>
+                    <th className="px-3 py-2.5">Reorder Limit</th>
+                    <th className="px-3 py-2.5">30d Moving Avg (Burn Rate)</th>
+                    <th className="px-3 py-2.5">Supplier Lead Time</th>
+                    <th className="px-3 py-2.5 bg-emerald-50/70 text-emerald-900 font-extrabold">
+                      Suggested Smart Order Qty
+                    </th>
+                    <th className="px-3 py-2.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {inventory.map(item => {
+                    const analysis = calculateOrderDate(item);
+                    const monthlyBurn = Number((analysis.dailyBurnRate * 30).toFixed(1));
+                    const isUrgent = item.howManyOnHand <= (item.emergencyStockLevel ?? item.whenToReorder);
+                    
+                    let expiryBadgeClass = 'bg-slate-100 text-slate-700';
+                    let expiryLabel = item.expiryDate || 'N/A';
+                    if (item.expiryDate) {
+                      const diffDays = Math.ceil((new Date(item.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      if (diffDays < 0) {
+                        expiryBadgeClass = 'bg-rose-100 text-rose-800 font-bold animate-pulse';
+                        expiryLabel = `${item.expiryDate} (${Math.abs(diffDays)}d Overdue)`;
+                      } else if (diffDays <= 30) {
+                        expiryBadgeClass = 'bg-amber-100 text-amber-800 font-bold';
+                        expiryLabel = `${item.expiryDate} (${diffDays}d left)`;
+                      } else {
+                        expiryBadgeClass = 'bg-emerald-50 text-emerald-800';
+                        expiryLabel = `${item.expiryDate} (${diffDays}d)`;
+                      }
+                    }
+
+                    return (
+                      <tr key={item.id} className={`hover:bg-slate-50 transition ${isUrgent ? 'bg-rose-50/30' : ''}`}>
+                        <td className="px-3 py-2.5 font-mono font-bold text-slate-700">{item.itemCode}</td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-900">{item.itemDescription}</td>
+                        <td className="px-3 py-2.5 text-slate-600">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100">{item.category}</span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] ${expiryBadgeClass}`}>
+                            {expiryLabel}
+                          </span>
+                        </td>
+                        <td className={`px-3 py-2.5 font-bold ${isUrgent ? 'text-rose-600' : 'text-slate-900'}`}>
+                          {item.howManyOnHand} {item.unit}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500">
+                          {item.whenToReorder} {item.unit}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-700">
+                          <div><strong className="text-slate-900">{monthlyBurn}</strong> {item.unit}/mo</div>
+                          <div className="text-[10px] text-slate-400">({analysis.dailyBurnRate} {item.unit}/day)</div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] text-slate-700 font-bold">
+                            {analysis.leadTimeDays}d lead
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 bg-emerald-50/40 font-bold text-emerald-800">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-extrabold font-mono">+{analysis.recommendedOrderQty} {item.unit}</span>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-bold">
+                              SMART
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            onClick={() => {
+                              const forecastItem = forecastItems.find(f => f.id === item.id) || {
+                                id: item.id,
+                                itemCode: item.itemCode,
+                                itemDescription: item.itemDescription,
+                                category: item.category,
+                                unit: item.unit,
+                                pricePerUnit: item.pricePerUnit,
+                                howManyOnHand: item.howManyOnHand,
+                                whenToReorder: item.whenToReorder,
+                                supplier: item.supplier,
+                                dailyBurnRate: analysis.dailyBurnRate,
+                                projectedTotalDemand: Math.ceil(analysis.dailyBurnRate * 30),
+                                projectedStockAtEnd: Math.max(0, item.howManyOnHand - Math.ceil(analysis.dailyBurnRate * 30)),
+                                stockoutRiskDays: analysis.daysUntilZeroStock,
+                                stockoutDate: analysis.stockoutDate,
+                                urgency: analysis.urgencyLabel,
+                                recommendedReorderQty: analysis.recommendedOrderQty,
+                                estimatedReorderCost: analysis.recommendedOrderQty * item.pricePerUnit,
+                                leadTimeDays: analysis.leadTimeDays
+                              };
+                              handleGenerateConsumablePO(forecastItem as any);
+                            }}
+                            className="px-2.5 py-1 bg-slate-900 hover:bg-emerald-600 text-white rounded-lg font-bold text-[10px] transition shadow-xs"
+                          >
+                            Draft PO
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
