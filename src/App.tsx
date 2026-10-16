@@ -1663,7 +1663,7 @@ export const App: React.FC = () => {
   };
 
   const [batchNotice, setBatchNotice] = useState<string | null>(null);
-  const [activeBatchModal, setActiveBatchModal] = useState<'category' | 'supplier' | 'reorder' | 'price' | 'location' | null>(null);
+  const [activeBatchModal, setActiveBatchModal] = useState<'category' | 'supplier' | 'reorder' | 'price' | 'location' | 'delete' | null>(null);
   const [batchLocationInput, setBatchLocationInput] = useState<string>('Main Storeroom Alpha');
   const [batchCategoryInput, setBatchCategoryInput] = useState<string>('Bedding & Linen');
   const [batchSupplierInput, setBatchSupplierInput] = useState<string>('Garden Route Hospitality Supplies');
@@ -1870,12 +1870,36 @@ export const App: React.FC = () => {
 
   const handleBatchDelete = () => {
     if (selectedItemIds.length === 0) return;
-    if (!confirm(`Are you sure you want to remove ${selectedItemIds.length} selected items from inventory?`)) return;
+    setActiveBatchModal('delete');
+  };
+
+  const handleConfirmBatchDelete = () => {
+    if (selectedItemIds.length === 0) return;
     const count = selectedItemIds.length;
+    const toDelete = inventory.filter(i => selectedItemIds.includes(i.id));
+    const nowIso = new Date().toISOString().replace('T', ' ').slice(0, 16);
+
+    // Create formal audit entries in stockAuditLogs
+    const newLogs: StockAuditLogEntry[] = toDelete.map(item => ({
+      id: `audit-del-${Date.now()}-${item.id}`,
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemDescription: item.itemDescription,
+      timestamp: nowIso,
+      previousQty: item.howManyOnHand,
+      newQty: 0,
+      deltaQty: -item.howManyOnHand,
+      actionType: 'Permanent Batch Purge',
+      adjustedBy: currentUser?.name || 'Authorized Stock Controller',
+      notes: `Permanently removed via Batch Deletion Tool (${count} items purged)`
+    }));
+
+    setStockAuditLogs(prev => [...newLogs, ...prev]);
     setInventory(prev => prev.filter(item => !selectedItemIds.includes(item.id)));
     setSelectedItemIds([]);
-    setBatchNotice(`Removed ${count} items from inventory.`);
-    setTimeout(() => setBatchNotice(null), 4000);
+    setActiveBatchModal(null);
+    setBatchNotice(`✓ Successfully permanently deleted ${count} selected item${count === 1 ? '' : 's'} from inventory.`);
+    setTimeout(() => setBatchNotice(null), 4500);
   };
 
   const handleExportBatchAuditReportCsv = () => {
@@ -2968,14 +2992,14 @@ export const App: React.FC = () => {
                       Synchronized Audit Count ({selectedItemIds.length})
                     </button>
 
-                    {/* QR Asset Scanner */}
+                    {/* QR Scan-All Mode */}
                     <button
                       onClick={handleOpenBatchQrScanner}
-                      className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-md transition border border-emerald-500/40"
-                      title="Launch QR Asset Scanner for rapid barcode scanning & verification"
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-800 to-teal-700 hover:from-emerald-700 hover:to-teal-600 text-white font-extrabold rounded-xl flex items-center gap-1.5 shadow-md transition border border-emerald-500/50 hover:scale-105"
+                      title="Launch continuous QR 'Scan-All' Mode for rapid barcode auditing across selected items"
                     >
-                      <QrIcon className="w-3.5 h-3.5 text-emerald-200" />
-                      QR Asset Scanner
+                      <Scan className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>QR Scan-All Mode ({selectedItemIds.length})</span>
                     </button>
 
                     {/* Batch Audit Report CSV */}
@@ -3111,13 +3135,14 @@ export const App: React.FC = () => {
                       Generate QR Codes ({selectedItemIds.length})
                     </button>
 
-                    {/* Batch Delete */}
+                    {/* Batch Deletion Tool */}
                     <button
                       onClick={handleBatchDelete}
-                      className="p-1.5 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 rounded-xl border border-rose-800/60 transition"
-                      title="Delete selected items"
+                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md border border-rose-500 transition hover:scale-105 active:scale-95"
+                      title="Permanently remove selected items from inventory (requires 'Confirm Delete' modal)"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5 text-white" />
+                      <span>Batch Delete ({selectedItemIds.length})</span>
                     </button>
                   </div>
                 </div>
@@ -4557,6 +4582,151 @@ export const App: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* BATCH MODAL: CONFIRM PERMANENT BATCH DELETION */}
+            {activeBatchModal === 'delete' && (() => {
+              const selectedItems = inventory.filter(i => selectedItemIds.includes(i.id));
+              const totalValuation = selectedItems.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.howManyOnHand), 0);
+              const totalUnits = selectedItems.reduce((acc, curr) => acc + curr.howManyOnHand, 0);
+
+              return (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+                  <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+                    {/* Modal Header */}
+                    <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-rose-950 text-white p-5 flex items-center justify-between border-b border-rose-900/60 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center shrink-0">
+                          <Trash2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-serif-luxury font-bold text-base sm:text-lg text-white">
+                              Confirm Permanent Batch Deletion
+                            </h4>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              Irreversible
+                            </span>
+                          </div>
+                          <p className="text-xs text-rose-200/80">
+                            Permanently purge {selectedItems.length} selected items from the Inventory Matrix.
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setActiveBatchModal(null)} 
+                        className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="p-6 space-y-4 overflow-y-auto">
+                      {/* Warning Callout */}
+                      <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <strong className="font-bold text-rose-950 block">Permanent Data Removal Warning</strong>
+                          <p className="text-[11px] leading-relaxed">
+                            You are about to permanently delete <strong className="text-rose-950">{selectedItems.length} catalog items</strong> from the database. All corresponding barcode lookups, on-hand counts, and reorder levels will be purged. This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Summary Metrics */}
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Items Selected</span>
+                          <span className="text-lg font-bold text-slate-900 font-mono">{selectedItems.length}</span>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Units</span>
+                          <span className="text-lg font-bold text-slate-900 font-mono">{totalUnits}</span>
+                        </div>
+                        <div className="bg-rose-50 p-3 rounded-2xl border border-rose-200">
+                          <span className="text-[10px] uppercase font-bold text-rose-700 block">Asset Value Purged</span>
+                          <span className="text-lg font-bold text-rose-800 font-mono">R {totalValuation.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Selected Items Preview Table */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                          <span>Items Slated for Deletion:</span>
+                          <span className="text-slate-400 text-[11px]">Showing {selectedItems.length} items</span>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-48 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
+                          {selectedItems.map(item => (
+                            <div key={item.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-slate-100 transition">
+                              <div className="truncate pr-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px]">
+                                    {item.itemCode}
+                                  </span>
+                                  <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                                    {item.itemDescription}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {item.category} · {item.location || 'Main Storeroom'}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-bold font-mono text-slate-800 text-xs block">
+                                  {item.howManyOnHand} {item.unit}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  R {item.pricePerUnit} ea
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* QR Scan-All Mode Pre-Verification Helper */}
+                      <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-xl flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Scan className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-slate-700 text-[11px]">
+                            Need to audit bins first? You can verify physical stock in <strong>QR Scan-All Mode</strong> before purging.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveBatchModal(null);
+                            handleOpenBatchQrScanner();
+                          }}
+                          className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 text-[11px] shrink-0 transition"
+                        >
+                          Verify in QR
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Modal Footer Controls */}
+                    <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setActiveBatchModal(null)}
+                        className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 transition"
+                      >
+                        Cancel (Keep Items)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmBatchDelete}
+                        className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg transition active:scale-95"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Confirm Delete ({selectedItems.length} Items)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* INVENTORY QR GENERATOR & ASSET SCANNER MODAL */}
             {qrModalItems && qrModalItems.length > 0 && (
