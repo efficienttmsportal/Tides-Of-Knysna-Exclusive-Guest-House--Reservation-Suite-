@@ -49,7 +49,8 @@ interface SynchronizedAuditCountModalProps {
       notes: string;
     }[],
     auditReason: string,
-    auditorName: string
+    auditorName: string,
+    generalComment?: string
   ) => void;
   onOpenQrScanner?: (item?: InventoryItem) => void;
   currentUser?: { fullName: string; role: string } | null;
@@ -86,12 +87,16 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
     return initial;
   });
 
+  const [auditedIds, setAuditedIds] = useState<Set<string>>(() => new Set());
   const [auditorName, setAuditorName] = useState(
     currentUser ? `${currentUser.fullName} (${currentUser.role})` : 'Eleanor Sterling (Head of Operations)'
   );
   const [auditReason, setAuditReason] = useState(AUDIT_REASONS[0]);
   const [searchFilter, setSearchFilter] = useState('');
   const [filterDiscrepancyOnly, setFilterDiscrepancyOnly] = useState(false);
+  const [generalComment, setGeneralComment] = useState('');
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -128,10 +133,12 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
     return matchesSearch && matchesDiscrepancy;
   });
 
-  // Aggregated Audit KPIs
+  // Aggregated Audit KPIs & Progress
   const totalSystemUnits = auditRows.reduce((sum, r) => sum + r.systemOnHand, 0);
   const totalPhysicalUnits = auditRows.reduce((sum, r) => sum + r.physicalCount, 0);
   const netUnitDifference = totalPhysicalUnits - totalSystemUnits;
+  const auditedCount = auditedIds.size;
+  const auditProgressPercent = selectedItems.length > 0 ? Math.min(100, Math.round((auditedCount / selectedItems.length) * 100)) : 0;
 
   let totalFinancialVariance = 0;
   let surplusItemCount = 0;
@@ -146,7 +153,7 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
     else balancedItemCount++;
   });
 
-  // Count Adjustment Helpers
+  // Count Adjustment & Audit Tracking Helpers
   const handleUpdatePhysicalCount = (itemId: string, newCount: number) => {
     const safeCount = Math.max(0, Math.floor(newCount || 0));
     setCounts((prev) => ({
@@ -156,6 +163,37 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
         physicalCount: safeCount
       }
     }));
+    setAuditedIds((prev) => {
+      const next = new Set(prev);
+      next.add(itemId);
+      return next;
+    });
+  };
+
+  const handleToggleAudited = (itemId: string) => {
+    setAuditedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const handleMarkAllAudited = () => {
+    const all = new Set<string>();
+    selectedItems.forEach((i) => all.add(i.id));
+    setAuditedIds(all);
+    setToastMessage('Marked all batch items as audited.');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleClearAudited = () => {
+    setAuditedIds(new Set());
+    setToastMessage('Cleared audit progress tracking.');
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleUpdateNotes = (itemId: string, notes: string) => {
@@ -166,30 +204,41 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
         notes
       }
     }));
+    setAuditedIds((prev) => {
+      const next = new Set(prev);
+      next.add(itemId);
+      return next;
+    });
   };
 
   const handleMatchAllToSystem = () => {
     const updated: Record<string, { physicalCount: number; notes: string }> = {};
+    const all = new Set<string>();
     selectedItems.forEach((item) => {
       updated[item.id] = {
         physicalCount: item.howManyOnHand,
         notes: counts[item.id]?.notes || 'Physical verification confirmed equal to system on-hand'
       };
+      all.add(item.id);
     });
     setCounts(updated);
-    setToastMessage('Reset all physical counts to match system inventory values.');
+    setAuditedIds(all);
+    setToastMessage('Reset all physical counts to match system inventory values and marked as audited.');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleZeroOutAll = () => {
     const updated: Record<string, { physicalCount: number; notes: string }> = {};
+    const all = new Set<string>();
     selectedItems.forEach((item) => {
       updated[item.id] = {
         physicalCount: 0,
         notes: counts[item.id]?.notes || 'Physical recount pending'
       };
+      all.add(item.id);
     });
     setCounts(updated);
+    setAuditedIds(all);
   };
 
   // Commit and Synchronize all items
@@ -205,7 +254,7 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
     }));
 
     setTimeout(() => {
-      onApplyAuditCounts(payload, auditReason, auditorName);
+      onApplyAuditCounts(payload, auditReason, auditorName, generalComment);
       setIsApplying(false);
       onClose();
     }, 400);
@@ -318,6 +367,16 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
 
             <button
               type="button"
+              onClick={() => setIsPrintPreviewOpen(true)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition"
+              title="Open Print Preview Mode in Landscape format with company branding and Export PDF"
+            >
+              <Printer className="w-3.5 h-3.5 text-white" />
+              Print Preview
+            </button>
+
+            <button
+              type="button"
               onClick={handleExportCsvVariance}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-slate-700 transition"
               title="Download variance report CSV"
@@ -418,7 +477,7 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
 
         {/* AUDIT PARAMETERS & QUICK ACTIONS BAR */}
         <div className="p-4 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs no-print">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <div className="flex items-center gap-1.5">
               <span className="text-slate-500 font-bold text-[11px]">Audit Reason:</span>
               <select
@@ -439,9 +498,30 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
                 value={auditorName}
                 onChange={(e) => setAuditorName(e.target.value)}
                 placeholder="Auditor staff name"
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 w-48"
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 w-40"
               />
             </div>
+
+            <div className="flex items-center gap-1.5 flex-1 min-w-[240px]">
+              <span className="text-slate-500 font-bold text-[11px] shrink-0">General Comment / Code:</span>
+              <input
+                type="text"
+                value={generalComment}
+                onChange={(e) => setGeneralComment(e.target.value)}
+                placeholder="Applicable to all audited items..."
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTutorialOpen(true)}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-300 transition flex items-center gap-1.5 shadow-2xs text-[11px] shrink-0"
+              title="View QR Scanner & Barcode Audit Tutorial"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>QR Scanner Tutorial</span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -487,12 +567,61 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
           </div>
         </div>
 
+        {/* VISUAL PROGRESS BAR & QR ASSET TAG TRACKING */}
+        <div className="bg-indigo-50/70 border-b border-indigo-100 p-4 no-print">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs font-mono font-bold text-sm">
+                {auditProgressPercent}%
+              </div>
+              <div className="flex-1 min-w-[220px]">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-800 mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <QrIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Batch Audit Progress (QR Asset Tags Verified)</span>
+                  </span>
+                  <span className="text-indigo-700 font-mono">
+                    {auditedCount} / {selectedItems.length} Audited ({auditProgressPercent}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden shadow-inner">
+                  <div
+                    className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${auditProgressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={handleMarkAllAudited}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1"
+                title="Mark all items in this batch as audited"
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Mark All Audited</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAudited}
+                className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-300 text-xs transition"
+                title="Reset audited status for all items"
+              >
+                Reset Progress
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* COMPARISON TABLE */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <table className="w-full text-xs text-left border-collapse">
             <thead className="bg-slate-900 text-white uppercase text-[10px] tracking-wider sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2.5 rounded-l-lg">Item Code</th>
+                <th className="px-3 py-2.5 rounded-l-lg text-center w-14">Audited</th>
+                <th className="px-3 py-2.5">Item Code & QR Tag</th>
                 <th className="px-3 py-2.5">Description & Location</th>
                 <th className="px-3 py-2.5 text-right">Unit Price</th>
                 <th className="px-3 py-2.5 text-center">System On-Hand</th>
@@ -509,14 +638,31 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
                 const isShortage = diff < 0;
                 const isSurplus = diff > 0;
                 const isBalanced = diff === 0;
+                const isAudited = auditedIds.has(row.itemId);
 
                 return (
                   <tr
                     key={row.itemId}
                     className={`hover:bg-slate-50/80 transition ${
-                      isShortage ? 'bg-rose-50/30' : isSurplus ? 'bg-blue-50/20' : ''
+                      isShortage ? 'bg-rose-50/30' : isSurplus ? 'bg-blue-50/20' : isAudited ? 'bg-emerald-50/20' : ''
                     }`}
                   >
+                    {/* Audited Checkbox / Status */}
+                    <td className="px-3 py-3 align-middle text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAudited(row.itemId)}
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition mx-auto cursor-pointer ${
+                          isAudited
+                            ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
+                            : 'bg-white border-slate-300 text-slate-300 hover:border-slate-400'
+                        }`}
+                        title={isAudited ? 'Marked as Audited (Click to unmark)' : 'Click to mark as Audited'}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+
                     {/* Item Code & QR */}
                     <td className="px-3 py-3 align-top font-mono font-bold text-slate-900">
                       <div className="flex items-center gap-1.5">
@@ -708,6 +854,250 @@ export const SynchronizedAuditCountModal: React.FC<SynchronizedAuditCountModalPr
             </button>
           </div>
         </div>
+
+        {/* QR SCANNER & BARCODE AUDIT TUTORIAL MODAL */}
+        {isTutorialOpen && (
+          <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in no-print">
+            <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+              <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white p-5 flex items-center justify-between border-b border-emerald-900/40">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif-luxury font-bold text-base text-white">
+                      QR Scanner & Barcode Audit Tutorial
+                    </h4>
+                    <p className="text-xs text-emerald-200/80">
+                      Step-by-step guide for rapid physical stocktaking using QR asset tags.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTutorialOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4 text-xs text-slate-700 overflow-y-auto max-h-[70vh]">
+                <div className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">1</span>
+                  <div>
+                    <strong className="text-slate-900 block font-bold mb-0.5">Launch QR Asset Scanner</strong>
+                    <p className="text-slate-600">
+                      Click the "QR Asset Scanner" button in the Inventory Matrix batch toolbar or the top bar of this Synchronized Audit Modal to open the camera scanner interface.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">2</span>
+                  <div>
+                    <strong className="text-slate-900 block font-bold mb-0.5">Scan Asset Barcodes & Tags</strong>
+                    <p className="text-slate-600">
+                      Point your device camera at any asset tag or barcode (e.g. LIN-1001 for Egyptian Cotton Sheets). The system instantly matches and highlights the target SKU.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">3</span>
+                  <div>
+                    <strong className="text-slate-900 block font-bold mb-0.5">Verify Physical Bin Counts</strong>
+                    <p className="text-slate-600">
+                      Input actual physical stock counted on warehouse shelves. The system automatically computes variances, surpluses, shortages, and financial impact in ZAR.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">4</span>
+                  <div>
+                    <strong className="text-slate-900 block font-bold mb-0.5">Commit & Audit Trail Logging</strong>
+                    <p className="text-slate-600">
+                      Apply any general comment or reason code, then click "Commit & Synchronize Audit" to permanently update inventory and log the audit entry with full accountability.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsTutorialOpen(false)}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md"
+                >
+                  Got It, Close Tutorial
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PRINT PREVIEW LANDSCAPE MODAL */}
+        {isPrintPreviewOpen && (
+          <div className="fixed inset-0 z-70 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 animate-fade-in no-print">
+            <style>{`
+              @media print {
+                @page { size: landscape; margin: 10mm; }
+                body * { visibility: hidden; }
+                #print-preview-container, #print-preview-container * { visibility: visible; }
+                #print-preview-container { position: absolute; left: 0; top: 0; width: 100%; }
+              }
+            `}</style>
+            <div id="print-preview-container" className="bg-white rounded-3xl max-w-7xl w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden">
+              {/* Preview Header Bar */}
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 no-print">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm">Synchronized Audit Count — Landscape Print Preview</h3>
+                    <p className="text-[11px] text-slate-400">Formatted for professional PDF export and landscape printing.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export PDF / Print Landscape</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintPreviewOpen(false)}
+                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Landscape Content */}
+              <div className="p-8 overflow-y-auto space-y-6 bg-slate-50 print:bg-white print:p-4 text-slate-900 max-h-[82vh]">
+                {/* Branding & Document Header */}
+                <div className="border-b-2 border-slate-900 pb-6 flex flex-wrap justify-between items-start gap-4">
+                  <div>
+                    <h1 className="text-2xl font-bold font-serif-luxury text-slate-900 tracking-tight">
+                      TIDES OF KNYSNA EXCLUSIVE GUEST HOUSE
+                    </h1>
+                    <p className="text-xs text-slate-600 font-medium uppercase tracking-wider mt-0.5">
+                      Official Synchronized Physical Stocktake & Variance Reconciliation Report (Landscape Edition)
+                    </p>
+                    <div className="text-xs text-slate-700 mt-3 space-y-0.5">
+                      <div><strong>Audit Reason:</strong> {auditReason}</div>
+                      <div><strong>Lead Auditor:</strong> {auditorName}</div>
+                      {generalComment && <div><strong>General Note:</strong> {generalComment}</div>}
+                    </div>
+                  </div>
+
+                  <div className="text-right text-xs bg-slate-100 print:bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                    <div className="font-mono font-bold text-slate-900">BATCH REF: AUD-{Date.now().toString().slice(-6)}</div>
+                    <div>Generated: {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}</div>
+                    <div>Total Items Audited: <strong>{selectedItems.length}</strong></div>
+                    <div>Net Unit Difference: <strong className={netUnitDifference >= 0 ? 'text-emerald-700' : 'text-rose-700'}>{netUnitDifference > 0 ? `+${netUnitDifference}` : netUnitDifference}</strong></div>
+                  </div>
+                </div>
+
+                {/* KPI Summary Grid */}
+                <div className="grid grid-cols-4 gap-4 text-xs">
+                  <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">System Expected</span>
+                    <div className="text-lg font-black font-mono text-slate-800">{totalSystemUnits} units</div>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Physical Counted</span>
+                    <div className="text-lg font-black font-mono text-indigo-700">{totalPhysicalUnits} units</div>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Net Variance</span>
+                    <div className={`text-lg font-black font-mono ${netUnitDifference >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {netUnitDifference > 0 ? `+${netUnitDifference}` : netUnitDifference} units
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Financial Impact</span>
+                    <div className={`text-lg font-black font-mono ${totalFinancialVariance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {totalFinancialVariance < 0 ? '-' : '+'}R {Math.abs(totalFinancialVariance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Landscape Table */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-slate-900 text-white uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="px-3 py-3">Item Code</th>
+                        <th className="px-3 py-3">Description</th>
+                        <th className="px-3 py-3">Category</th>
+                        <th className="px-3 py-3">Location</th>
+                        <th className="px-3 py-3 text-right">Unit Price (ZAR)</th>
+                        <th className="px-3 py-3 text-center">System</th>
+                        <th className="px-3 py-3 text-center">Physical</th>
+                        <th className="px-3 py-3 text-center">Variance</th>
+                        <th className="px-3 py-3 text-right">Impact (ZAR)</th>
+                        <th className="px-3 py-3">Auditor Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {auditRows.map((row) => {
+                        const diff = row.physicalCount - row.systemOnHand;
+                        const valueDiff = diff * row.unitPrice;
+                        const isShortage = diff < 0;
+                        const isSurplus = diff > 0;
+                        const isBalanced = diff === 0;
+
+                        return (
+                          <tr key={row.itemId} className={isShortage ? 'bg-rose-50/40' : isSurplus ? 'bg-blue-50/30' : ''}>
+                            <td className="px-3 py-2.5 font-mono font-bold">{row.itemCode}</td>
+                            <td className="px-3 py-2.5 font-semibold text-slate-800">{row.itemDescription}</td>
+                            <td className="px-3 py-2.5 text-slate-500">{row.category}</td>
+                            <td className="px-3 py-2.5 text-slate-600">{row.location}</td>
+                            <td className="px-3 py-2.5 text-right font-mono">R {row.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2.5 text-center font-mono font-bold">{row.systemOnHand}</td>
+                            <td className="px-3 py-2.5 text-center font-mono font-bold text-indigo-700">{row.physicalCount}</td>
+                            <td className="px-3 py-2.5 text-center font-mono">
+                              {isBalanced ? (
+                                <span className="text-emerald-700 font-bold">0 (Ok)</span>
+                              ) : isSurplus ? (
+                                <span className="text-blue-700 font-bold">+{diff}</span>
+                              ) : (
+                                <span className="text-rose-700 font-bold">{diff}</span>
+                              )}
+                            </td>
+                            <td className={`px-3 py-2.5 text-right font-mono font-bold ${isBalanced ? 'text-slate-400' : isSurplus ? 'text-blue-700' : 'text-rose-700'}`}>
+                              {valueDiff < 0 ? '-' : valueDiff > 0 ? '+' : ''}R {Math.abs(valueDiff).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-600 italic">{row.notes || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Sign-off Footer */}
+                <div className="pt-8 border-t border-slate-300 flex justify-between items-end text-xs text-slate-700">
+                  <div className="space-y-4">
+                    <div><strong>Lead Auditor Signature:</strong> ___________________________</div>
+                    <div><strong>Operations Manager Approval:</strong> ___________________________</div>
+                  </div>
+                  <div className="text-right text-slate-500">
+                    Tides of Knysna Exclusive Guest House • Internal Stock Verification System
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
