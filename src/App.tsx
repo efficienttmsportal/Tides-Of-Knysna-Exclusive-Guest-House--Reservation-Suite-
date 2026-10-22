@@ -2097,7 +2097,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+      <main style={{ backgroundColor: '#ffffff' }} className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between pb-4 no-print text-xs text-slate-500">
           <div className="flex items-center gap-2">

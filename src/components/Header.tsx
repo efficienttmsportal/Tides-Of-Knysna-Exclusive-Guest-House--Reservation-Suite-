@@ -135,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-xl no-print">
       {/* Top micro status bar */}
       <div 
-        style={{ backgroundColor: '#020345' }}
+        style={{ backgroundColor: '#ff1804' }}
         className="px-4 py-1.5 border-b border-slate-800/80 text-xs text-slate-300 flex flex-wrap items-center justify-between gap-3"
       >
         <div 
@@ -443,7 +443,10 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-200">
+          <div 
+            style={{ backgroundColor: '#4aef56' }}
+            className="flex items-center gap-1.5 text-xs bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-200"
+          >
             <span 
               style={{ backgroundColor: '#0569a2' }}
               className="text-emerald-400 font-bold hidden sm:inline px-1 rounded"
@@ -481,14 +484,14 @@ export const Header: React.FC<HeaderProps> = ({
           {/* UNIVERSAL PRINT HUB TRIGGER */}
           <button
             id="btn-header-print-hub"
-            style={{ backgroundColor: '#fb2c00' }}
+            style={{ backgroundColor: '#2800fb' }}
             onClick={onOpenPrintHub || (() => window.print())}
             className="hover:opacity-90 text-white px-2.5 py-0.5 rounded text-xs border border-rose-600 transition flex items-center gap-1 font-bold shadow-xs"
             title="Open Universal Document Print Hub (Inkjet, Laserjet, Inktank Compatible)"
           >
             <Printer className="w-3.5 h-3.5 text-white" />
             <span 
-              style={{ backgroundColor: '#f10909' }}
+              style={{ backgroundColor: '#09d8f1' }}
               className="hidden md:inline px-1 py-0.5 rounded"
             >
               Print Hub
@@ -498,7 +501,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser ? (
             <div className="flex items-center gap-2">
               <span 
-                style={{ backgroundColor: '#ab00be' }}
+                style={{ backgroundColor: '#0ad7f7', color: '#042d64' }}
                 className="px-2 py-0.5 rounded text-[11px] font-semibold tracking-wide uppercase text-white border border-purple-400/40"
               >
                 {currentUser.role === 'admin' ? 'Administrator' : 'Guest Account Trial'}
@@ -510,7 +513,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="text-slate-400 hover:text-rose-400 p-1 transition"
                 title="Log Out"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut style={{ backgroundColor: '#93e90c' }} className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
@@ -540,7 +543,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main branding & navigation bar */}
       <div 
-        style={{ backgroundColor: '#2f0070' }}
+        style={{ backgroundColor: '#f3ffd6' }}
         className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4"
       >
         {/* Brand identity */}
@@ -561,14 +564,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-serif-luxury text-lg md:text-xl font-bold tracking-tight text-white group-hover:text-emerald-300 transition-colors">
+              <h1 style={{ color: '#1908ea' }} className="font-serif-luxury text-lg md:text-xl font-bold tracking-tight group-hover:text-emerald-300 transition-colors">
                 {info.name}
               </h1>
               <span className="hidden xl:inline-block px-2 py-0.5 text-[10px] uppercase font-bold tracking-widest bg-emerald-950 text-emerald-300 border border-emerald-700/60 rounded">
                 Reservation Suite
               </span>
             </div>
-            <p className="text-xs text-slate-300 italic hidden sm:block">
+            <p style={{ color: '#0f0f0f' }} className="text-xs italic hidden sm:block">
               "{info.tagline}"
             </p>
           </div>
@@ -579,34 +582,31 @@ export const Header: React.FC<HeaderProps> = ({
           {/* GUEST PORTAL PILL */}
           <button
             id="nav-pill-guestportal"
+            style={{ backgroundColor: '#a1ffbf', color: '#0b0b0b' }}
             onClick={() => setActiveTab('guestportal')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
-              activeTab === 'guestportal'
-                ? 'bg-amber-400 text-slate-950 font-bold shadow-md'
-                : 'bg-amber-950/40 text-amber-200 border border-amber-600/40 hover:bg-amber-900/60'
-            }`}
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 shadow-md hover:opacity-90"
           >
-            <KeyRound className="w-3 h-3 text-amber-400" />
+            <KeyRound style={{ color: '#0e0e0e' }} className="w-3 h-3" />
             Guest Portal
           </button>
 
           {/* UNIVERSAL PRINT HUB PILL */}
           <button
             id="nav-pill-printhub"
-            style={{ backgroundColor: '#f2460c' }}
+            style={{ backgroundColor: '#fb9471', color: '#0d0c0c' }}
             onClick={onOpenPrintHub || (() => window.print())}
-            className="px-2.5 py-1 text-xs rounded-md font-bold transition flex items-center gap-1 text-white hover:opacity-90 border border-slate-700 shadow-xs"
+            className="px-2.5 py-1 text-xs rounded-md font-bold transition flex items-center gap-1 hover:opacity-90 border border-slate-700 shadow-xs"
             title="Open Universal Document Print & Export Hub"
           >
-            <Printer className="w-3 h-3 text-white" />
+            <Printer style={{ color: '#080707' }} className="w-3 h-3" />
             Print Hub
           </button>
 
           <button
             id="nav-pill-res"
-            style={{ backgroundColor: '#277a05' }}
+            style={{ backgroundColor: '#94f16e', color: '#0e0d0d' }}
             onClick={() => setActiveTab('reservations')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">R</span>
             Reservations
@@ -614,9 +614,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-checkin"
-            style={{ backgroundColor: '#c8148e' }}
+            style={{ backgroundColor: '#fc7ed3', color: '#131212' }}
             onClick={() => setActiveTab('checkin')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">CHI</span>
             Check-In
@@ -634,9 +634,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-accounting"
-            style={{ backgroundColor: '#02c20a' }}
+            style={{ backgroundColor: '#02c20a', color: '#0a0a0a' }}
             onClick={() => setActiveTab('accounting')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">Acc</span>
             Accounts
@@ -644,12 +644,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-marketing"
+            style={{ backgroundColor: '#ea60e2', color: '#0b0b0b' }}
             onClick={() => setActiveTab('marketing')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
-              activeTab === 'marketing'
-                ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-            }`}
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 shadow-md hover:opacity-90"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">Mark</span>
             Marketing
@@ -657,9 +654,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-employees"
-            style={{ backgroundColor: '#ec7b93' }}
+            style={{ backgroundColor: '#ec7b93', color: '#0b0b0b' }}
             onClick={() => setActiveTab('employees')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">EMP</span>
             Employees
@@ -667,12 +664,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-inventory"
+            style={{ backgroundColor: '#6f5ef8', color: '#060606' }}
             onClick={() => setActiveTab('inventory')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
-              activeTab === 'inventory'
-                ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-            }`}
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 shadow-md hover:opacity-90"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">Inv</span>
             Inventory
@@ -683,9 +677,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-suppliers"
-            style={{ backgroundColor: '#76bc67' }}
+            style={{ backgroundColor: '#76bc67', color: '#0e0d0d' }}
             onClick={() => setActiveTab('suppliers')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">SCon</span>
             Suppliers
@@ -693,9 +687,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-attractions"
-            style={{ backgroundColor: '#bc957d' }}
+            style={{ backgroundColor: '#bc957d', color: '#0d0c0c' }}
             onClick={() => setActiveTab('attractions')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">MAP</span>
             Attractions
@@ -704,9 +698,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* COMPANY INFO ALL EDITABLE PILL */}
           <button
             id="nav-pill-company"
-            style={{ backgroundColor: '#abb565' }}
+            style={{ backgroundColor: '#abb565', color: '#0b0b0b' }}
             onClick={() => setActiveTab('company')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <Building2 className="w-3 h-3 text-white" />
             Company Info
@@ -714,9 +708,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-addressbook"
-            style={{ backgroundColor: '#6ea5aa' }}
+            style={{ backgroundColor: '#6ea5aa', color: '#0d0c0c' }}
             onClick={() => setActiveTab('addressbook')}
-            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 text-white hover:opacity-90 shadow-md"
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 hover:opacity-90 shadow-md"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">AB</span>
             Guest Address Book
@@ -724,12 +718,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             id="nav-pill-minutes"
+            style={{ backgroundColor: '#60de0a', color: '#060606' }}
             onClick={() => setActiveTab('minutes')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 ${
-              activeTab === 'minutes'
-                ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-            }`}
+            className="px-2.5 py-1 text-xs rounded-md font-medium transition flex items-center gap-1 shadow-md hover:opacity-90"
           >
             <span className="font-bold text-[10px] px-1 bg-black/20 rounded">MIN</span>
             Meeting Minutes
