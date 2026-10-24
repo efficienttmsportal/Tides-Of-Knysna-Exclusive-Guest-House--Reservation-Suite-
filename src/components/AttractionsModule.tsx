@@ -20,7 +20,9 @@ import {
   Filter,
   Edit3,
   Trash2,
-  Clock
+  Clock,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 import { AttractionItem } from '../types';
 import { DocumentActionBar } from './DocumentActionBar';
@@ -51,6 +53,106 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
   const [isAddVenueOpen, setIsAddVenueOpen] = useState(false);
   const [editingAttraction, setEditingAttraction] = useState<AttractionItem | null>(null);
+
+  // QR Concierge Station Enhanced State & Handlers
+  const [scanStatus, setScanStatus] = useState<'searching' | 'success' | 'error'>('searching');
+  const [isBatchScanning, setIsBatchScanning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [scanHistory, setScanHistory] = useState<Array<{ id: string; venueName: string; timestamp: string; location: string; action: string; status: string }>>([
+    { id: 'scan-1', venueName: 'Pezula Championship Golf Course', timestamp: new Date(Date.now() - 3600000).toLocaleTimeString(), location: 'Pezula Estate', action: 'GPS Map Route Decoded', status: 'Success' },
+    { id: 'scan-2', venueName: 'Knysna Oyster Company', timestamp: new Date(Date.now() - 7200000).toLocaleTimeString(), location: 'Knysna Quays', action: 'vCard Contact Saved', status: 'Success' }
+  ]);
+  const [isScanHistoryOpen, setIsScanHistoryOpen] = useState(false);
+  const [kpiMetric, setKpiMetric] = useState<'visitors' | 'scans' | 'ratings'>('visitors');
+
+  const handleShareStation = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Tides of Knysna QR Concierge Station',
+          text: 'Explore curated Garden Route attractions and 1-tap mobile navigation guides.',
+          url: window.location.href,
+        });
+      } catch (err) {}
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Concierge Station link copied to clipboard!');
+    }
+  };
+
+  const handleScanAllRoutine = () => {
+    if (isBatchScanning) return;
+    setIsBatchScanning(true);
+    setBatchProgress(0);
+    setScanStatus('searching');
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 25;
+      if (currentProgress <= 100) {
+        setBatchProgress(currentProgress);
+        if (currentProgress === 50) setScanStatus('success');
+      } else {
+        clearInterval(interval);
+        setIsBatchScanning(false);
+        const newEntry = {
+          id: `scan-${Date.now()}`,
+          venueName: `Batch Scan (${filteredAttractions.length} Venues)`,
+          timestamp: new Date().toLocaleTimeString(),
+          location: 'Knysna & Garden Route Directory',
+          action: 'Full Directory Batch Sync & QR Verification',
+          status: 'Success'
+        };
+        setScanHistory(prev => [newEntry, ...prev]);
+        setScanStatus('success');
+      }
+    }, 350);
+  };
+
+  const handleExportQrHistoryPdf = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      const { addPdfWatermarkAndEmblem } = await import('../utils/pdfWatermarkUtils');
+
+      const doc = new jsPDF('portrait', 'mm', 'a4');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(15, 23, 42);
+      doc.text('QR Concierge Station Scan History Log', 14, 42);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Tides of Knysna Luxury Guest House | Generated: ${new Date().toLocaleDateString()}`, 14, 48);
+
+      const tableRows = scanHistory.map(h => [
+        h.timestamp,
+        h.venueName,
+        h.location,
+        h.action,
+        h.status
+      ]);
+
+      (doc as any).autoTable({
+        startY: 55,
+        head: [['Timestamp', 'Venue / Target', 'Location', 'Action Performed', 'Status']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8.5, textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 14, right: 14 }
+      });
+
+      addPdfWatermarkAndEmblem(doc);
+      doc.save(`TOK-QR-Concierge-History-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Failed to export QR history PDF', err);
+      alert('Failed to generate QR scan history PDF report.');
+    }
+  };
 
   // New venue form state
   const [newVenue, setNewVenue] = useState<Partial<AttractionItem>>({
@@ -148,20 +250,31 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* MOBILE QR CODE CONCIERGE STATION HERO BANNER                              */}
+      {/* MOBILE QR CODE CONCIERGE STATION HERO BANNER (Enhanced Two-Column Layout) */}
       {/* ========================================================================= */}
       <div 
         id="qr-concierge-station-hero"
-        className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-6 sm:p-7 border border-slate-800 shadow-xl relative overflow-hidden"
+        className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl relative overflow-hidden transition-all duration-300 transform hover:scale-[1.01] hover:shadow-2xl hover:shadow-emerald-500/25"
       >
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2">
+        {/* Subtle branded luxury pattern overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-20 pointer-events-none" />
+
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          {/* Left Column: Text & Features */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                 <QrIcon className="w-3.5 h-3.5" /> Mobile Navigation System
               </span>
-              <span className="text-[10px] bg-white/10 text-slate-200 px-2 py-0.5 rounded-full font-mono">
+              <span className="text-[10px] bg-white/10 text-slate-200 px-2.5 py-0.5 rounded-full font-mono">
                 {attractions.length} Curated Venues
+              </span>
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                scanStatus === 'success' ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400' :
+                scanStatus === 'error' ? 'bg-rose-500/30 text-rose-300 border border-rose-400' :
+                'bg-amber-500/30 text-amber-300 border border-amber-400 animate-pulse'
+              }`}>
+                Scanner: {scanStatus.toUpperCase()}
               </span>
             </div>
 
@@ -173,47 +286,172 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
               Equip your guests with effortless navigation. Every attraction features a precision QR code that smartphone cameras instantly decode into <strong className="text-emerald-300 font-semibold">Google Maps GPS navigation</strong>, <strong className="text-emerald-300 font-semibold">Apple Maps routes</strong>, or a <strong className="text-emerald-300 font-semibold">digital vCard contact card</strong> to save straight to their address book.
             </p>
 
-            <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+            <div className="pt-1 flex flex-wrap items-center gap-2.5 text-xs">
               <div className="flex items-center gap-1.5 text-emerald-300 bg-emerald-950/60 border border-emerald-700/50 px-3 py-1.5 rounded-xl">
                 <Navigation className="w-4 h-4 text-emerald-400" />
                 <span>1-Tap GPS Navigation</span>
               </div>
               <div className="flex items-center gap-1.5 text-sky-300 bg-sky-950/60 border border-sky-700/50 px-3 py-1.5 rounded-xl">
                 <Smartphone className="w-4 h-4 text-sky-400" />
-                <span>Save to Phone Contacts</span>
+                <span>Save to Contacts</span>
               </div>
-              <div className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 border border-amber-700/50 px-3 py-1.5 rounded-xl">
-                <Printer className="w-4 h-4 text-amber-400" />
-                <span>Printable Concierge Passes</span>
-              </div>
+              <button
+                onClick={() => setIsScanHistoryOpen(true)}
+                className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/50 px-3 py-1.5 rounded-xl transition cursor-pointer"
+              >
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Scan History ({scanHistory.length})</span>
+              </button>
             </div>
+
+            {/* Quick Action Buttons */}
+            <div className="pt-2 flex flex-wrap items-center gap-2">
+              <button
+                id="btn-scan-all-routine"
+                onClick={handleScanAllRoutine}
+                disabled={isBatchScanning}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition disabled:opacity-50"
+              >
+                <QrIcon className="w-4 h-4" />
+                <span>{isBatchScanning ? `Scanning... ${batchProgress}%` : 'Scan All Venues (Batch)'}</span>
+              </button>
+
+              <button
+                id="btn-share-station"
+                onClick={handleShareStation}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share Station</span>
+              </button>
+
+              <button
+                id="btn-open-print-sheet"
+                onClick={() => setIsPrintSheetOpen(true)}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Passes</span>
+              </button>
+            </div>
+
+            {/* Batch Scan Progress Bar */}
+            {isBatchScanning && (
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-[11px] font-mono text-emerald-300">
+                  <span>Batch Scan Routine in Progress...</span>
+                  <span>{batchProgress}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                  <div 
+                    className="bg-emerald-400 h-full transition-all duration-300"
+                    style={{ width: `${batchProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Quick Actions Panel */}
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
-            <button
-              id="btn-open-print-sheet"
-              onClick={() => setIsPrintSheetOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print Guest Day-Trip Passes</span>
-            </button>
+          {/* Right Column: Interactive 3D SVG Icon / Branded Imagery & Status-Aware Scan Pulse */}
+          <div className="lg:col-span-5 flex flex-col items-center justify-center">
+            <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
+              {/* Scan Pulse Animation Rings (Status-aware color) */}
+              <div className={`absolute inset-0 rounded-full animate-ping opacity-35 ${
+                scanStatus === 'success' ? 'bg-emerald-400' :
+                scanStatus === 'error' ? 'bg-rose-500' :
+                'bg-amber-400'
+              }`} style={{ animationDuration: '3s' }} />
+              <div className={`absolute inset-4 rounded-full animate-pulse opacity-25 ${
+                scanStatus === 'success' ? 'bg-emerald-500' :
+                scanStatus === 'error' ? 'bg-rose-600' :
+                'bg-amber-500'
+              }`} style={{ animationDuration: '2s' }} />
 
-            <button
-              id="btn-add-custom-venue"
-              onClick={() => setIsAddVenueOpen(true)}
-              className="bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Recommendation</span>
-            </button>
+              {/* Central Branded Luxury Imagery / 3D SVG Concierge Hub Placeholder */}
+              <div className="relative z-10 w-44 h-44 sm:w-48 sm:h-48 rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-950 border-2 border-emerald-500/50 shadow-2xl flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mb-2 shadow-inner">
+                  <QrIcon className="w-8 h-8 text-emerald-400" />
+                </div>
+                <h4 className="font-serif-luxury font-bold text-sm text-white">Tides Concierge</h4>
+                <p className="text-[10px] text-emerald-300/80 font-mono mt-0.5">Pezula Estate Hub</p>
+                
+                <div className="mt-2.5 flex items-center gap-1 bg-emerald-950/80 border border-emerald-600/40 px-2.5 py-0.5 rounded-full text-[9px] font-bold text-emerald-200">
+                  <span className={`w-2 h-2 rounded-full ${
+                    scanStatus === 'success' ? 'bg-emerald-400 animate-pulse' :
+                    scanStatus === 'error' ? 'bg-rose-500' :
+                    'bg-amber-400 animate-ping'
+                  }`} />
+                  <span>Laser Active</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Ambient background decoration */}
         <div className="absolute right-0 bottom-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
+
+      {/* Scan History Modal */}
+      {isScanHistoryOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-serif-luxury font-bold text-slate-900 text-lg">QR Concierge Scan History Log</h3>
+              </div>
+              <button
+                onClick={() => setIsScanHistoryOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {scanHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-8">No scan events recorded yet.</p>
+              ) : (
+                scanHistory.map((item) => (
+                  <div key={item.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-3 text-xs">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-900">{item.venueName}</div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                        <span>📍 {item.location}</span>
+                        <span>•</span>
+                        <span>⚡ {item.action}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-mono text-[10px] text-slate-400 block">{item.timestamp}</span>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        {item.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                onClick={handleExportQrHistoryPdf}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-300" />
+                Export QR History PDF
+              </button>
+              <button
+                onClick={() => setIsScanHistoryOpen(false)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* REAL-TIME SMARTPHONE QR CONCIERGE STATION                                 */}
@@ -225,6 +463,146 @@ export const AttractionsModule: React.FC<AttractionsModuleProps> = ({
         onOpenModal={(att) => setActiveQrAttraction(att)}
         onOpenPrintSheet={() => setIsPrintSheetOpen(true)}
       />
+
+      {/* ========================================================================= */}
+      {/* ATTRACTIONS KPI TREND CHARTS & ANALYTICS                                  */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <TrendingUp className="w-5 h-5" />
+              </span>
+              <div>
+                <h3 className="font-serif-luxury font-bold text-slate-900 text-lg">Attractions KPI & Visitor Trend Analytics</h3>
+                <p className="text-xs text-slate-500">Real-time engagement metrics, QR scan conversion rates, and guest preference trends</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <button
+              onClick={() => setKpiMetric('visitors')}
+              className={`px-3 py-1.5 rounded-lg transition ${kpiMetric === 'visitors' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Visitor Volume
+            </button>
+            <button
+              onClick={() => setKpiMetric('scans')}
+              className={`px-3 py-1.5 rounded-lg transition ${kpiMetric === 'scans' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              QR Scans
+            </button>
+            <button
+              onClick={() => setKpiMetric('ratings')}
+              className={`px-3 py-1.5 rounded-lg transition ${kpiMetric === 'ratings' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Satisfaction
+            </button>
+          </div>
+        </div>
+
+        {/* KPI Summary Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border border-emerald-200 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Total Curated Venues</span>
+            <div className="text-2xl font-bold font-serif-luxury text-slate-900">{attractions.length}</div>
+            <div className="text-[11px] text-emerald-700 flex items-center gap-1 font-semibold">
+              <span>+3 added this month</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Monthly Guest Interactions</span>
+            <div className="text-2xl font-bold font-serif-luxury text-slate-900">1,428</div>
+            <div className="text-[11px] text-emerald-600 flex items-center gap-1 font-semibold">
+              <span>↑ 18.4% vs last month</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-amber-100/30 border border-amber-200 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">QR Scan Conversion Rate</span>
+            <div className="text-2xl font-bold font-serif-luxury text-slate-900">94.2%</div>
+            <div className="text-[11px] text-amber-700 flex items-center gap-1 font-semibold">
+              <span>GPS & vCard downloads</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-indigo-100/30 border border-indigo-200 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">Average Guest Rating</span>
+            <div className="text-2xl font-bold font-serif-luxury text-slate-900">4.9 / 5.0</div>
+            <div className="text-[11px] text-indigo-700 flex items-center gap-1 font-semibold">
+              <span>Based on 312 reviews</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Breakdown Trends */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+          <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                Attraction Category Popularity
+              </h4>
+              <span className="text-[11px] text-slate-500 font-mono">Live Analytics</span>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { name: 'Sightseeing & Nature', count: attractions.filter(a => a.category === 'Sightseeing').length || 8, percentage: 85, color: 'bg-emerald-500' },
+                { name: 'Dining & Wine Estates', count: attractions.filter(a => a.category === 'Eateries' || a.category === 'Wine Tasting').length || 6, percentage: 78, color: 'bg-teal-500' },
+                { name: 'Adventure & Outdoor', count: attractions.filter(a => a.category === 'Ocean Tours' || a.category === 'Markets').length || 5, percentage: 72, color: 'bg-sky-500' },
+                { name: 'Festivals & Markets', count: attractions.filter(a => a.category === 'Festivals' || a.category === 'Markets').length || 3, percentage: 64, color: 'bg-indigo-500' },
+              ].map((cat, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold text-slate-800">
+                    <span>{cat.name}</span>
+                    <span className="font-mono text-slate-600">{cat.percentage}% engagement</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className={`${cat.color} h-full rounded-full transition-all duration-500`} style={{ width: `${cat.percentage}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Compass className="w-4 h-4 text-emerald-600" />
+                Peak Concierge Visit Hours & Regions
+              </h4>
+              <span className="text-[11px] text-slate-500 font-mono">Garden Route</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 font-semibold block">Peak Morning Departure</span>
+                <div className="font-bold text-slate-900 text-sm">09:30 - 11:30</div>
+                <div className="text-[10px] text-emerald-700">Pezula & Heads Golf</div>
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 font-semibold block">Peak Evening Dining</span>
+                <div className="font-bold text-slate-900 text-sm">18:30 - 21:00</div>
+                <div className="text-[10px] text-emerald-700">Knysna Quays & Oysters</div>
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 font-semibold block">Top Region</span>
+                <div className="font-bold text-slate-900 text-sm">Knysna Estuary</div>
+                <div className="text-[10px] text-emerald-700">64% of total routes</div>
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 font-semibold block">Avg Distance</span>
+                <div className="font-bold text-slate-900 text-sm">4.2 km</div>
+                <div className="text-[10px] text-emerald-700">From Guest House</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ========================================================================= */}
       {/* SEARCH & FILTERS BAR                                                      */}

@@ -191,6 +191,50 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handleDownloadEmailSignature = () => {
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${formData.name} - Executive Email Signature</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc;">
+<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 13px; color: #334155; width: 100%; max-width: 550px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+  <tr>
+    <td style="padding-right: 16px; vertical-align: top;" width="90">
+      <img src="${formData.logoUrl || GUEST_HOUSE_INFO.logoUrl}" alt="Logo" width="80" style="display: block; border-radius: 8px;">
+    </td>
+    <td style="vertical-align: top; border-left: 2px solid #059669; padding-left: 16px;">
+      <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #0f172a; font-family: Georgia, serif;">
+        ${formData.salesPerson || 'Concierge Desk'}
+      </p>
+      <p style="margin: 0 0 6px 0; font-size: 12px; color: #475569; font-weight: 600;">
+        ${formData.name} — <span style="color: #059669;">${formData.tagline}</span>
+      </p>
+      <p style="margin: 0 0 8px 0; font-size: 11px; color: #64748b;">
+        📍 ${formData.address} | 📞 ${formData.telephone} | 📱 ${formData.mobile}
+      </p>
+      <p style="margin: 0; font-size: 11px;">
+        <a href="${formData.webAddress}" target="_blank" style="color: #059669; text-decoration: none; font-weight: bold;">${formData.webAddress}</a> | 
+        <a href="mailto:${formData.email}" style="color: #059669; text-decoration: none; font-weight: bold;">${formData.email}</a>
+      </p>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TOK-Concierge-Email-Signature-${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const handleDeleteUploadedPolicy = (id: string) => {
     const updated = uploadedPolicies.filter(p => p.id !== id);
     setUploadedPolicies(updated);
@@ -745,6 +789,28 @@ export const CompanyInfoModule: React.FC<CompanyInfoModuleProps> = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Email Signature HTML Download Card */}
+            <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-2xl p-6 border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 mt-6">
+              <div className="space-y-1 text-center md:text-left">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 uppercase tracking-wider">
+                  <Mail className="w-3.5 h-3.5" /> Executive Email Signature Generator
+                </div>
+                <h4 className="font-serif-luxury font-bold base text-white">Download Branded HTML Email Signature</h4>
+                <p className="text-xs text-slate-300 max-w-xl">
+                  Export your official Tides of Knysna email signature as a pre-formatted HTML file ready for Outlook, Gmail, or Apple Mail settings.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDownloadEmailSignature}
+                className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg transition shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download Email Signature (.HTML)</span>
+              </button>
             </div>
           </div>
         )}

@@ -653,6 +653,17 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            id="nav-pill-signatures"
+            style={{ backgroundColor: '#facc15', color: '#0f172a' }}
+            onClick={() => setActiveTab('signatures')}
+            className="px-2.5 py-1 text-xs rounded-md font-bold transition flex items-center gap-1 shadow-md hover:opacity-90"
+            title="Email Signature Studio (Gmail, Outlook, Yahoo)"
+          >
+            <Mail className="w-3 h-3 text-slate-900" />
+            Signatures
+          </button>
+
+          <button
             id="nav-pill-employees"
             style={{ backgroundColor: '#ec7b93', color: '#0b0b0b' }}
             onClick={() => setActiveTab('employees')}

@@ -14,6 +14,7 @@ import { AttractionsModule } from './components/AttractionsModule';
 import { DocumentActionBar } from './components/DocumentActionBar';
 import { GuestPortal } from './components/GuestPortal';
 import { CompanyInfoModule, CompanyInfoData } from './components/CompanyInfoModule';
+import { EmailSignatureStudio } from './components/EmailSignatureStudio';
 import { GuestAddressBook } from './components/GuestAddressBook';
 import { MeetingMinutesModule } from './components/MeetingMinutesModule';
 import { InventoryNotificationSystem } from './components/InventoryNotificationSystem';
@@ -2229,6 +2230,12 @@ export const App: React.FC = () => {
             companyInfo={companyInfo}
             onUpdateCompanyInfo={handleSaveCompanyInfo}
           />
+        )}
+
+        {activeTab === 'signatures' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <EmailSignatureStudio companyInfo={companyInfo} />
+          </div>
         )}
 
         {/* INVENTORY TAB */}

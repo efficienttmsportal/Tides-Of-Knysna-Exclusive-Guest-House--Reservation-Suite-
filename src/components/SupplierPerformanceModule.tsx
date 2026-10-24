@@ -139,6 +139,61 @@ export const SupplierPerformanceModule: React.FC<SupplierPerformanceModuleProps>
     playLaserTagSound();
   };
 
+  // Quick-Report PDF Export using jspdf, jspdf-autotable, and addPdfWatermarkAndEmblem
+  const handleExportSupplierPdf = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      const { addPdfWatermarkAndEmblem } = await import('../utils/pdfWatermarkUtils');
+
+      const doc = new jsPDF('portrait', 'mm', 'a4');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Supplier Performance & Lead Time Quick-Report', 14, 42);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Tides of Knysna Luxury Guest House | Generated on: ${new Date().toLocaleDateString()}`, 14, 48);
+
+      const tableRows = suppliersList.map(sup => {
+        const metrics = vendorMetrics[sup] || { leadTimeDays: 3.0, fulfillmentAccuracy: 95.0, monthlyOrdersAvg: 3, rating: 4.5 };
+        const data = supplierMap[sup];
+        const isBottleneck = metrics.leadTimeDays > 14;
+        return [
+          sup,
+          data.items.length,
+          `R ${data.totalValue.toLocaleString()}`,
+          `${metrics.leadTimeDays} Days`,
+          isBottleneck ? 'Bottleneck (>14d)' : 'Normal SLA',
+          `${metrics.fulfillmentAccuracy}%`,
+          `${metrics.rating} / 5.0`,
+          data.lowStockCount
+        ];
+      });
+
+      (doc as any).autoTable({
+        startY: 55,
+        head: [['Supplier Name', 'Items', 'Valuation', 'Lead Time', 'SLA Status', 'Fulfillment', 'Rating', 'Low Stock']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8.5, textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 14, right: 14 }
+      });
+
+      addPdfWatermarkAndEmblem(doc);
+      doc.save(`TOK-Supplier-Performance-QuickReport-${new Date().toISOString().split('T')[0]}.pdf`);
+      playLaserTagSound();
+    } catch (err) {
+      console.error('Failed to export supplier PDF', err);
+      alert('Failed to generate supplier performance PDF.');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Targeted Focus Banner (When jumped from Reorder Notification) */}
@@ -213,6 +268,14 @@ export const SupplierPerformanceModule: React.FC<SupplierPerformanceModuleProps>
           >
             <Download className="w-4 h-4 text-emerald-400" />
             Export Supplier CSV
+          </button>
+          <button
+            onClick={handleExportSupplierPdf}
+            className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md transition"
+            title="Export Supplier Performance & Lead Times to Branded PDF Quick-Report"
+          >
+            <FileText className="w-4 h-4 text-amber-300" />
+            Quick-Report PDF
           </button>
           <button
             onClick={onGenerateDraftPo}

@@ -178,7 +178,10 @@ export const CheckInModule: React.FC<CheckInModuleProps> = ({ reservations, comp
 
         {/* Right: Active Check-in Form Checklist (8 cols) */}
         {activeCheckIn && (
-          <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6 printable-area">
+          <div 
+            key={activeCheckIn.id}
+            className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6 printable-area animate-in fade-in slide-in-from-right-4 duration-300"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
               <div>
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">

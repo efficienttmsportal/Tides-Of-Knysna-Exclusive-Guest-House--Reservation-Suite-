@@ -2791,7 +2791,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-slate-900 rounded-full"></span>
                 </div>
                 <div>
-                  <h4 className="font-serif-luxury font-bold text-sm leading-tight">Knysna Concierge WhatsApp</h4>
+                  <h4 className="font-serif-luxury font-bold text-sm leading-tight">Tides Of Knysna Exclusive Guest House Concierge</h4>
                   <p className="text-[10px] text-emerald-300">Eleanor Sterling • Typically replies in 5 min</p>
                 </div>
               </div>
@@ -2927,7 +2927,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({
           </span>
           <WhatsAppIcon className="w-6 h-6 text-slate-950" />
           <span className="hidden sm:inline font-bold text-xs pr-1">
-            WhatsApp Concierge
+            Tides Of Knysna Exclusive Guest House Concierge
           </span>
         </button>
       </div>
